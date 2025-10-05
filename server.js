@@ -1,5 +1,4 @@
 // server.js - VERSIÓN CON BASE DE DATOS
-require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const Database = require('./database.js');
