@@ -3,16 +3,24 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
 class Database {
-    constructor() {
-        this.db = new sqlite3.Database('./cafeteria.db', (err) => {
-            if (err) {
-                console.error('❌ Error abriendo la base de datos:', err);
-            } else {
-                console.log('✅ Base de datos conectada: cafeteria.db');
-                this.crearTablas();
-            }
-        });
-    }
+    // En database.js - VERSIÓN PARA RENDER
+constructor() {
+    // 🔥 PARA RENDER - Usar base de datos en memoria
+    const dbPath = process.env.NODE_ENV === 'production' 
+        ? ':memory:'  // Base de datos en RAM (se pierde al reiniciar)
+        : './cafeteria.db';
+    
+    console.log('📁 Usando base de datos:', dbPath);
+    
+    this.db = new sqlite3.Database(dbPath, (err) => {
+        if (err) {
+            console.error('❌ Error abriendo BD:', err);
+        } else {
+            console.log('✅ BD conectada:', dbPath);
+            this.crearTablas();
+        }
+    });
+}
 
     crearTablas() {
         // Tabla de productos
