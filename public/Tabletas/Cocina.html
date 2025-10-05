@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cocina - Mi Cafetería</title>
+    <link rel="stylesheet" href="style-cocina.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>👨‍🍳 COCINA</h1>
+            <p>Órdenes de alimentos pendientes</p>
+            <div class="stats">
+                <span id="ordenes-pendientes">0 órdenes pendientes</span>
+            </div>
+        </header>
+
+        <div class="orders-container">
+            <div id="ordenes-cocina" class="orders-grid">
+                <div class="loading">Cargando órdenes...</div>
+            </div>
+        </div>
+
+        <div class="no-orders hidden" id="no-orders">
+            <p>✅ No hay órdenes pendientes para cocina</p>
+        </div>
+    </div>
+
+    <script src="script-cocina.js"></script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Cocina - Cafetería</title>
+    <style>
+        body { font-family: Arial; background: #8B4513; color: white; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; color: #333; padding: 20px; border-radius: 10px; }
+        .orden { background: #FFF8E1; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #DC143C; }
+        .mesa { background: #8B4513; color: white; padding: 5px 10px; border-radius: 3px; font-weight: bold; }
+        button { background: #2E8B57; color: white; border: none; padding: 8px 15px; margin: 5px; border-radius: 3px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>👨‍🍳 COCINA</h1>
+        <p>Órdenes pendientes de alimentos</p>
+        <div id="ordenes-cocina">
+            <p>Cargando órdenes...</p>
+        </div>
+    </div>
+
+    <script>
+        async function cargarOrdenes() {
+            try {
+                const response = await fetch('/ordenes');
+                const data = await response.json();
+                
+                const ordenesCocina = data.ordenes.filter(orden => 
+                    orden.items.some(item => item.categoria === 'alimento')
+                );
+                
+                const contenedor = document.getElementById('ordenes-cocina');
+                
+                if (ordenesCocina.length === 0) {
+                    contenedor.innerHTML = '<p>✅ No hay órdenes pendientes para cocina</p>';
+                    return;
+                }
+                
+                contenedor.innerHTML = ordenesCocina.map(orden => {
+                    const alimentos = orden.items.filter(item => item.categoria === 'alimento');
+                    
+                    return `
+                        <div class="orden">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span class="mesa">MESA ${orden.mesa}</span>
+                                <span style="color: #666;">Orden #${orden.id}</span>
+                            </div>
+                            <div style="margin: 10px 0;">
+                                ${alimentos.map(item => `
+                                    <div style="padding: 5px 0;">
+                                        <strong>${item.nombre}</strong> x${item.cantidad}
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <div>
+                                <button onclick="marcarPreparando(${orden.id})">👨‍🍳 Preparando</button>
+                                <button onclick="marcarListo(${orden.id})">✅ Listo</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+            } catch (error) {
+                document.getElementById('ordenes-cocina').innerHTML = '<p>❌ Error cargando órdenes</p>';
+            }
+        }
+        
+        function marcarPreparando(ordenId) {
+            alert('👨‍🍳 Comenzando a preparar orden #' + ordenId);
+        }
+        
+        function marcarListo(ordenId) {
+            alert('✅ Orden #' + ordenId + ' LISTA para servir');
+        }
+        
+        // Cargar órdenes al iniciar y cada 3 segundos
+        cargarOrdenes();
+        setInterval(cargarOrdenes, 3000);
+    </script>
+</body>
+</html>
+    

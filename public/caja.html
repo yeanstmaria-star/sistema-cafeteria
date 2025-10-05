@@ -1,0 +1,96 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Caja - Cafetería</title>
+    <style>
+        body { font-family: Arial; background: #2E8B57; color: white; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; color: #333; padding: 20px; border-radius: 10px; }
+        .orden { background: #F0FFF0; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #2E8B57; }
+        .mesa { background: #2E8B57; color: white; padding: 5px 10px; border-radius: 3px; font-weight: bold; }
+        .total { font-size: 1.5em; font-weight: bold; color: #2E8B57; text-align: center; margin: 10px 0; }
+        button { background: #2E8B57; color: white; border: none; padding: 10px 20px; margin: 5px; border-radius: 3px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💰 CAJA</h1>
+        <p>Sistema de cobro</p>
+        <div id="ordenes-caja">
+            <p>Cargando órdenes...</p>
+        </div>
+    </div>
+
+    <script>
+        async function cargarOrdenes() {
+            try {
+                const response = await fetch('/ordenes');
+                const data = await response.json();
+                
+                const contenedor = document.getElementById('ordenes-caja');
+                
+                if (data.ordenes.length === 0) {
+                    contenedor.innerHTML = '<p>✅ No hay órdenes pendientes de cobro</p>';
+                    return;
+                }
+                
+                contenedor.innerHTML = data.ordenes.map(orden => {
+                    const alimentos = orden.items.filter(item => item.categoria === 'alimento');
+                    const bebidas = orden.items.filter(item => item.categoria === 'bebida');
+                    
+                    return `
+                        <div class="orden">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span class="mesa">MESA ${orden.mesa}</span>
+                                <span style="color: #666;">Orden #${orden.id}</span>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 15px 0;">
+                                <div>
+                                    <h4>🍽️ Alimentos</h4>
+                                    ${alimentos.map(item => `
+                                        <div>${item.nombre} x${item.cantidad} - $${(item.precio * item.cantidad).toFixed(2)}</div>
+                                    `).join('')}
+                                    ${alimentos.length === 0 ? '<div>No hay alimentos</div>' : ''}
+                                </div>
+                                
+                                <div>
+                                    <h4>☕ Bebidas</h4>
+                                    ${bebidas.map(item => `
+                                        <div>${item.nombre} x${item.cantidad} - $${(item.precio * item.cantidad).toFixed(2)}</div>
+                                    `).join('')}
+                                    ${bebidas.length === 0 ? '<div>No hay bebidas</div>' : ''}
+                                </div>
+                            </div>
+                            
+                            <div class="total">Total: $${orden.total.toFixed(2)}</div>
+                            
+                            <div style="text-align: center;">
+                                <button onclick="cobrarOrden(${orden.id})">💳 Cobrar $${orden.total.toFixed(2)}</button>
+                                <button onclick="generarFactura(${orden.id})" style="background: #4169E1;">🧾 Factura</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+            } catch (error) {
+                document.getElementById('ordenes-caja').innerHTML = '<p>❌ Error cargando órdenes</p>';
+            }
+        }
+        
+        function cobrarOrden(ordenId) {
+            alert('💰 Cobrando orden #' + ordenId);
+        }
+        
+        function generarFactura(ordenId) {
+            alert('🧾 Generando factura para orden #' + ordenId);
+        }
+        
+        // Cargar órdenes al iniciar y cada 3 segundos
+        cargarOrdenes();
+        setInterval(cargarOrdenes, 3000);
+    </script>
+</body>
+</html>
+    

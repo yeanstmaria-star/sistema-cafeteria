@@ -1,0 +1,22 @@
+{
+  "name": "sistema-cafeteria",
+  "version": "1.0.0",
+  "description": "Sistema completo de gestión para cafeterías",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node probar-db.js"
+  },
+  "keywords": ["cafeteria", "restaurant", "pos", "ordenes"],
+  "author": "Tu Nombre",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "sqlite3": "^5.1.6",
+    "twilio": "^4.19.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

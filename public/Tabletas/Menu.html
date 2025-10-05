@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Menú Digital - Mi Cafetería</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Encabezado -->
+        <header class="header">
+            <h1>☕ Menú Digital</h1>
+            <p>Mesa #<span id="mesa-numero">1</span></p>
+        </header>
+
+        <!-- Menú de productos -->
+        <section class="menu-section">
+            <h2>🛍️ Nuestro Menú</h2>
+            <div id="menu-items" class="menu-grid">
+                <!-- Aquí se cargarán los productos automáticamente -->
+                <div class="loading">Cargando menú...</div>
+            </div>
+        </section>
+
+        <!-- Carrito de compras -->
+        <section class="cart-section">
+            <h2>🛒 Tu Pedido</h2>
+            <div id="cart-items" class="cart-items">
+                <p class="empty-cart">Tu carrito está vacío</p>
+            </div>
+            <div class="cart-total">
+                <strong>Total: $<span id="total">0.00</span></strong>
+            </div>
+            <button id="send-order" class="send-button" disabled>
+                📤 Enviar a Cocina
+            </button>
+        </section>
+
+        <!-- Mensajes de confirmación -->
+        <div id="message" class="message hidden"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

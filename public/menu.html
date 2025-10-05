@@ -1,0 +1,106 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Menú - Cafetería</title>
+    <style>
+        body { font-family: Arial; background: #8B4513; color: white; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: white; color: #333; padding: 20px; border-radius: 10px; }
+        .menu-item { background: #f9f9f9; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #8B4513; }
+        button { background: #8B4513; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 MENÚ DIGITAL</h1>
+        <p>Mesa <span id="mesa">3</span></p>
+        
+        <div id="menu">
+            <div class="menu-item">
+                <h3>☕ Capuchino - $3.50</h3>
+                <button onclick="agregarAlCarrito('Capuchino', 3.50)">Agregar</button>
+            </div>
+            <div class="menu-item">
+                <h3>🥐 Croissant - $2.00</h3>
+                <button onclick="agregarAlCarrito('Croissant', 2.00)">Agregar</button>
+            </div>
+            <div class="menu-item">
+                <h3>🍵 Té Verde - $2.50</h3>
+                <button onclick="agregarAlCarrito('Té Verde', 2.50)">Agregar</button>
+            </div>
+        </div>
+        
+        <div id="carrito" style="margin-top: 20px; padding: 15px; background: #FFF8E1; border-radius: 5px;">
+            <h3>🛒 Tu Pedido</h3>
+            <div id="items-carrito"></div>
+            <p><strong>Total: $<span id="total">0.00</span></strong></p>
+            <button onclick="enviarPedido()" style="background: #2E8B57; padding: 12px 20px;">📤 Enviar a Cocina</button>
+        </div>
+    </div>
+
+    <script>
+        let carrito = [];
+        let total = 0;
+        
+        function agregarAlCarrito(nombre, precio) {
+            carrito.push({nombre, precio});
+            total += precio;
+            actualizarCarrito();
+            alert('✅ ' + nombre + ' agregado al carrito');
+        }
+        
+        function actualizarCarrito() {
+            const itemsDiv = document.getElementById('items-carrito');
+            const totalSpan = document.getElementById('total');
+            
+            itemsDiv.innerHTML = carrito.map(item => 
+                '<div>' + item.nombre + ' - $' + item.precio + '</div>'
+            ).join('');
+            
+            totalSpan.textContent = total.toFixed(2);
+        }
+        
+        async function enviarPedido() {
+            if (carrito.length === 0) {
+                alert('🛒 El carrito está vacío');
+                return;
+            }
+            
+            const mesa = document.getElementById('mesa').textContent;
+            const pedido = {
+                mesa: parseInt(mesa),
+                items: carrito.map(item => ({
+                    nombre: item.nombre,
+                    precio: item.precio,
+                    cantidad: 1,
+                    categoria: item.nombre.includes('Capuchino') || item.nombre.includes('Té') ? 'bebida' : 'alimento'
+                })),
+                total: total
+            };
+            
+            try {
+                const response = await fetch('/api/order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(pedido)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('🎉 ¡Pedido enviado! Orden #' + result.orderId);
+                    carrito = [];
+                    total = 0;
+                    actualizarCarrito();
+                } else {
+                    alert('❌ Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('❌ Error de conexión');
+            }
+        }
+    </script>
+</body>
+</html>
+    
