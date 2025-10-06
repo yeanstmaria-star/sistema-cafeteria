@@ -1,30 +1,39 @@
 {
   "name": "sistema-cafeteria",
   "version": "1.0.0",
-  "description": "Sistema completo de gestión para cafeterías",
+  "description": "Sistema completo de gestión para cafeterías con tabletas digitales, asistente de voz y base de datos",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "test": "node probar-db.js"
+    "test": "node probar-db.js",
+    "llamadas": "node llamadas-server.js"
   },
   "keywords": [
     "cafeteria",
     "restaurant",
     "pos",
-    "ordenes"
+    "ordenes",
+    "tabletas",
+    "asistente-voz",
+    "nodejs",
+    "express",
+    "sqlite"
   ],
-  "author": "Tu Nombre",
+  "author": "yeanstmaria-star",
   "license": "MIT",
-  {
   "dependencies": {
+    "dotenv": "^16.6.1",
     "express": "^4.18.2",
     "sqlite3": "^5.1.6",
-    "dotenv": "^16.3.1",
     "twilio": "^4.19.0"
   },
-
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yeanstmaria-star/sistema-cafeteria"
+  },
+  "homepage": "https://github.com/yeanstmaria-star/sistema-cafeteria#readme"
 }
