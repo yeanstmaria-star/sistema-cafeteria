@@ -1,72 +1,69 @@
-// script-caja.js - VERSIÓN PARA PRODUCCIÓN
+// script-caja.js - VERSIÓN ESTABLE
+console.log('💰 script-caja.js CARGADO - Iniciando caja...');
+
 class CajaDisplay {
     constructor() {
         this.ordenes = [];
-        // Obtener la URL base automáticamente
         this.baseURL = window.location.origin;
+        this.cargando = false;
+        
         console.log('💰 Caja conectada a:', this.baseURL);
         
         this.inicializar();
         this.cargarOrdenes();
-        // Actualizar cada 5 segundos
         setInterval(() => this.cargarOrdenes(), 5000);
     }
 
     inicializar() {
-        console.log('💰 Pantalla de CAJA iniciada');
+        console.log('💰 Pantalla de CAJA iniciada correctamente');
     }
 
     async cargarOrdenes() {
+        if (this.cargando) return;
+        this.cargando = true;
+        
         try {
-            const response = await fetch(`${this.baseURL}/ordenes`);
-            const data = await response.json();
+            console.log('🔄 Caja: Cargando órdenes...');
+            const response = await fetch(this.baseURL + '/ordenes');
             
-            if (data.success) {
+            if (!response.ok) {
+                throw new Error(`Error HTTP: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('✅ Caja: Recibidas', data.ordenes?.length, 'órdenes');
+            
+            if (data.success && Array.isArray(data.ordenes)) {
                 this.ordenes = data.ordenes;
                 this.mostrarOrdenes();
                 this.actualizarEstadisticas();
-            } else {
-                console.error('❌ Error en respuesta:', data);
             }
             
         } catch (error) {
-            console.error('❌ Error cargando órdenes:', error);
-            this.mostrarError('Error de conexión con el servidor');
+            console.error('❌ Caja - Error:', error.message);
+        } finally {
+            this.cargando = false;
         }
     }
 
     mostrarOrdenes() {
         const contenedor = document.getElementById('ordenes-caja');
-        const noOrders = document.getElementById('no-orders');
+        
+        console.log('💰 Mostrando', this.ordenes.length, 'órdenes en caja');
 
         if (this.ordenes.length === 0) {
-            contenedor.classList.add('hidden');
-            noOrders.classList.remove('hidden');
+            contenedor.innerHTML = `
+                <div class="no-orders-message">
+                    <h3>💰 Sin órdenes pendientes</h3>
+                    <p>No hay órdenes para cobrar en este momento</p>
+                    <p>Última actualización: ${new Date().toLocaleTimeString()}</p>
+                </div>
+            `;
             return;
         }
 
-        contenedor.classList.remove('hidden');
-        noOrders.classList.add('hidden');
-
         contenedor.innerHTML = this.ordenes.map(orden => {
-            const items = orden.items_descripcion ? orden.items_descripcion.split(',') : [];
-            
-            // Separar alimentos y bebidas
-            const alimentos = items.filter(item => 
-                item.includes('Croissant') || 
-                item.includes('Bagel') || 
-                item.includes('Galleta') || 
-                item.includes('Sándwich') || 
-                item.includes('Ensalada')
-            );
-            
-            const bebidas = items.filter(item => 
-                item.includes('Capuchino') || 
-                item.includes('Latte') || 
-                item.includes('Té Verde') || 
-                item.includes('Chocolate') || 
-                item.includes('Jugo')
-            );
+            const items = orden.items_descripcion ? orden.items_descripcion.split(',') : ['Sin items'];
             
             return `
                 <div class="caja-order">
@@ -76,44 +73,33 @@ class CajaDisplay {
                             <div class="order-id">Orden #${orden.id}</div>
                         </div>
                         <div class="order-time">
-                            ${new Date(orden.creado_en).toLocaleString()}
+                            ${new Date(orden.creado_en).toLocaleTimeString()}
                         </div>
                     </div>
                     
                     <div class="order-details">
                         <div class="detail-section">
-                            <h3>🍽️ Alimentos</h3>
+                            <h3>📋 Items:</h3>
                             <ul class="items-list">
-                                ${alimentos.map(item => `
+                                ${items.map(item => `
                                     <li>${item.trim()}</li>
                                 `).join('')}
-                                ${alimentos.length === 0 ? '<li>No hay alimentos</li>' : ''}
-                            </ul>
-                        </div>
-                        
-                        <div class="detail-section">
-                            <h3>☕ Bebidas</h3>
-                            <ul class="items-list">
-                                ${bebidas.map(item => `
-                                    <li>${item.trim()}</li>
-                                `).join('')}
-                                ${bebidas.length === 0 ? '<li>No hay bebidas</li>' : ''}
                             </ul>
                         </div>
                         
                         <div class="detail-section total-section">
                             <h3>💰 Total a Cobrar</h3>
-                            <div class="total-amount">$${orden.total ? orden.total.toFixed(2) : '0.00'}</div>
-                            <div class="order-status">${orden.estado || 'recibido'}</div>
+                            <div class="total-amount">$${orden.total.toFixed(2)}</div>
+                            <div class="order-status">${orden.estado}</div>
                         </div>
                     </div>
                     
                     <div class="order-actions">
                         <button class="btn btn-cobrar" onclick="caja.cobrarOrden(${orden.id})">
-                            💳 Cobrar $${orden.total ? orden.total.toFixed(2) : '0.00'}
+                            💳 Cobrar $${orden.total.toFixed(2)}
                         </button>
                         <button class="btn btn-factura" onclick="caja.generarFactura(${orden.id})">
-                            🧾 Generar Factura
+                            🧾 Factura
                         </button>
                     </div>
                 </div>
@@ -122,50 +108,40 @@ class CajaDisplay {
     }
 
     actualizarEstadisticas() {
-        const totalPorCobrar = this.ordenes.reduce((sum, orden) => sum + (orden.total || 0), 0);
+        const total = this.ordenes.reduce((sum, orden) => sum + (orden.total || 0), 0);
         document.getElementById('total-cobrar').textContent = 
-            `$${totalPorCobrar.toFixed(2)} por cobrar (${this.ordenes.length} órdenes)`;
+            `$${total.toFixed(2)} por cobrar (${this.ordenes.length} órdenes)`;
     }
 
     cobrarOrden(ordenId) {
         const orden = this.ordenes.find(o => o.id === ordenId);
         if (orden) {
-            console.log(`💰 Cobrando orden ${ordenId} - Total: $${orden.total}`);
-            alert(`¡Orden #${ordenId} de Mesa ${orden.mesa} cobrada por $${orden.total ? orden.total.toFixed(2) : '0.00'}!`);
+            alert(`💰 Orden #${ordenId} cobrada - $${orden.total.toFixed(2)}`);
         }
     }
 
     generarFactura(ordenId) {
         const orden = this.ordenes.find(o => o.id === ordenId);
         if (orden) {
-            console.log(`🧾 Generando factura para orden ${ordenId}`);
-            
-            const items = orden.items_descripcion ? orden.items_descripcion.split(',') : [];
-            
             const factura = `
-FACTURA - Mi Cafetería
-Orden #${orden.id} - Mesa ${orden.mesa}
+FACTURA - Café Tech
+Orden: #${orden.id} | Mesa: ${orden.mesa}
 ${new Date().toLocaleString()}
 
-${items.map(item => item.trim()).join('\n')}
+${orden.items_descripcion.split(',').map(item => item.trim()).join('\n')}
 
-TOTAL: $${orden.total ? orden.total.toFixed(2) : '0.00'}
+TOTAL: $${orden.total.toFixed(2)}
 
-¡Gracias por su visita!
+¡Gracias por su visita! ☕
             `;
-            
-            alert('Factura generada:\n\n' + factura);
+            alert('Factura:\n\n' + factura);
         }
-    }
-
-    mostrarError(mensaje) {
-        const contenedor = document.getElementById('ordenes-caja');
-        contenedor.innerHTML = `<div class="error">${mensaje}</div>`;
     }
 }
 
-// Iniciar la pantalla de caja
-let caja;
-document.addEventListener('DOMContentLoaded', () => {
-    caja = new CajaDisplay();
+// Inicializar caja
+console.log('📝 Registrando caja...');
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🎉 DOM cargado - Iniciando caja...');
+    window.caja = new CajaDisplay();
 });
