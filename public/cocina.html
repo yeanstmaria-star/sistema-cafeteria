@@ -1,25 +1,35 @@
-
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Cocina - Cafetería</title>
-    <style>
-        body { font-family: Arial; background: #8B4513; color: white; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; background: white; color: #333; padding: 20px; border-radius: 10px; }
-        .orden { background: #FFF8E1; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #DC143C; }
-        .mesa { background: #8B4513; color: white; padding: 5px 10px; border-radius: 3px; font-weight: bold; }
-        button { background: #2E8B57; color: white; border: none; padding: 8px 15px; margin: 5px; border-radius: 3px; cursor: pointer; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cocina - Mi Cafetería</title>
+    <link rel="stylesheet" href="style-cocina.css">
 </head>
 <body>
     <div class="container">
-        <h1>👨‍🍳 COCINA</h1>
-        <p>Órdenes pendientes de alimentos</p>
-        <div id="ordenes-cocina">
-            <p>Cargando órdenes...</p>
+        <header class="header">
+            <h1>👨‍🍳 COCINA</h1>
+            <p>Órdenes de alimentos pendientes</p>
+            <div class="stats">
+                <span id="ordenes-pendientes">0 órdenes pendientes</span>
+            </div>
+        </header>
+
+        <div class="orders-container">
+            <div id="ordenes-cocina" class="orders-grid">
+                <div class="loading">Cargando órdenes...</div>
+            </div>
+        </div>
+
+        <div class="no-orders hidden" id="no-orders">
+            <p>✅ No hay órdenes pendientes para cocina</p>
         </div>
     </div>
+
+    <script src="script-cocina.js"></script>
+</body>
+</html>
 
     <script>
         async function cargarOrdenes() {
