@@ -127,6 +127,16 @@ app.get('/', (req, res) => {
     `);
 });
 
+// Endpoint de salud para verificar que el servidor está vivo
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'OK',
+        message: 'Servidor funcionando correctamente',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development'
+    });
+});
+
 // API para obtener el menú DESDE LA BASE DE DATOS
 app.get('/menu', (req, res) => {
     db.obtenerProductos((err, productos) => {
@@ -230,17 +240,32 @@ function obtenerIdProductoPorNombre(nombre) {
     return productosMap[nombre] || 1; // Default al primer producto si no encuentra
 }
 
-// API para ver todas las órdenes DESDE BASE DE DATOS
+// API para ver todas las órdenes DESDE BASE DE DATOS - VERSIÓN CORREGIDA
 app.get('/ordenes', (req, res) => {
     db.obtenerOrdenes((err, ordenes) => {
         if (err) {
             console.error('❌ Error obteniendo órdenes:', err);
-            res.status(500).json({ error: 'Error obteniendo órdenes' });
+            res.status(500).json({ 
+                success: false,
+                error: 'Error obteniendo órdenes',
+                message: err.message 
+            });
         } else {
+            // 🔥 CORRECCIÓN: Asegurar que siempre devolvemos el formato correcto
+            const ordenesFormateadas = ordenes.map(orden => ({
+                id: orden.id,
+                mesa: orden.mesa,
+                total: orden.total || 0,
+                estado: orden.estado || 'recibido',
+                tipo: orden.tipo || 'mesa',
+                creado_en: orden.creado_en,
+                items_descripcion: orden.items_descripcion || 'No items'
+            }));
+            
             res.json({
                 success: true,
-                total: ordenes.length,
-                ordenes: ordenes
+                total: ordenesFormateadas.length,
+                ordenes: ordenesFormateadas
             });
         }
     });
