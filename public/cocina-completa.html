@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cocina - Mi Cafetería</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #8B4513, #A0522D);
+            color: white;
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 5px;
+        }
+
+        .stats {
+            font-size: 1.2em;
+            color: #FFD700;
+        }
+
+        .orders-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 15px;
+        }
+
+        .kitchen-order {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            border-left: 5px solid #DC143C;
+            color: #333;
+        }
+
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #8B4513;
+        }
+
+        .mesa-number {
+            background: #8B4513;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .order-time {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .food-items {
+            margin: 10px 0;
+        }
+
+        .food-item {
+            background: #FFF8E1;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 5px;
+            border-left: 3px solid #FFA500;
+        }
+
+        .order-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            flex: 1;
+        }
+
+        .btn-preparando {
+            background: #FFA500;
+            color: white;
+        }
+
+        .btn-listoo {
+            background: #2E8B57;
+            color: white;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+            font-size: 1.3em;
+            grid-column: 1 / -1;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .no-orders-message {
+            text-align: center;
+            padding: 40px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            border: 2px dashed rgba(255,255,255,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>👨‍🍳 COCINA</h1>
+            <p>Órdenes de alimentos pendientes</p>
+            <div class="stats">
+                <span id="ordenes-pendientes">0 órdenes pendientes</span>
+            </div>
+        </header>
+
+        <div class="orders-container">
+            <div id="ordenes-cocina" class="orders-grid">
+                <div class="loading">🔄 Cargando órdenes...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ✅ COCINA COMPLETA - TODO EN UN ARCHIVO
+        console.log('🚀 COCINA - Iniciando sistema...');
+        
+        class CocinaDisplay {
+            constructor() {
+                this.ordenes = [];
+                this.baseURL = window.location.origin;
+                this.cargando = false;
+                
+                console.log('👨‍🍳 Conectado a:', this.baseURL);
+                
+                this.inicializar();
+                this.cargarOrdenes();
+                // Actualizar cada 4 segundos
+                setInterval(() => this.cargarOrdenes(), 4000);
+            }
+
+            inicializar() {
+                console.log('✅ Cocina inicializada');
+                document.getElementById('ordenes-pendientes').textContent = 'Conectado...';
+            }
+
+            async cargarOrdenes() {
+                if (this.cargando) return;
+                this.cargando = true;
+                
+                try {
+                    console.log('📡 Consultando API...');
+                    const response = await fetch(this.baseURL + '/ordenes');
+                    
+                    if (!response.ok) throw new Error('Error: ' + response.status);
+                    
+                    const data = await response.json();
+                    console.log('✅ API OK -', data.ordenes.length, 'órdenes');
+                    
+                    if (data.success) {
+                        this.ordenes = data.ordenes;
+                        this.mostrarOrdenes();
+                        this.actualizarEstadisticas();
+                    }
+                    
+                } catch (error) {
+                    console.log('⚠️ Error temporal:', error.message);
+                } finally {
+                    this.cargando = false;
+                }
+            }
+
+            mostrarOrdenes() {
+                const contenedor = document.getElementById('ordenes-cocina');
+                
+                // Filtrar órdenes con alimentos
+                const ordenesConAlimentos = this.ordenes.filter(orden => {
+                    return orden.items_descripcion && (
+                        orden.items_descripcion.includes('Croissant') ||
+                        orden.items_descripcion.includes('Galleta') ||
+                        orden.items_descripcion.includes('Sándwich') ||
+                        orden.items_descripcion.includes('Bagel') ||
+                        orden.items_descripcion.includes('Ensalada')
+                    );
+                });
+
+                console.log('🍽️ Órdenes con alimentos:', ordenesConAlimentos.length);
+
+                if (ordenesConAlimentos.length === 0) {
+                    contenedor.innerHTML = `
+                        <div class="no-orders-message">
+                            <h3>✅ Sin órdenes para cocina</h3>
+                            <p>Las órdenes actuales son de bebidas</p>
+                            <p><em>Se actualiza automáticamente</em></p>
+                            <p>Última actualización: ${new Date().toLocaleTimeString()}</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                contenedor.innerHTML = ordenesConAlimentos.map(orden => {
+                    const alimentos = orden.items_descripcion.split(',').filter(item => 
+                        item.includes('Croissant') || item.includes('Galleta') || 
+                        item.includes('Sándwich') || item.includes('Bagel') || 
+                        item.includes('Ensalada')
+                    );
+
+                    return `
+                        <div class="kitchen-order">
+                            <div class="order-header">
+                                <div class="mesa-number">MESA ${orden.mesa}</div>
+                                <div class="order-id">#${orden.id}</div>
+                                <div class="order-time">${new Date(orden.creado_en).toLocaleTimeString()}</div>
+                            </div>
+                            
+                            <div class="food-items">
+                                <h4>🍽️ Alimentos:</h4>
+                                ${alimentos.map(item => `
+                                    <div class="food-item">${item.trim()}</div>
+                                `).join('')}
+                            </div>
+                            
+                            <div class="order-actions">
+                                <button class="btn btn-preparando" onclick="alert('Preparando orden #${orden.id}')">
+                                    👨‍🍳 Preparando
+                                </button>
+                                <button class="btn btn-listoo" onclick="alert('Orden #${orden.id} lista!')">
+                                    ✅ Listo
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            actualizarEstadisticas() {
+                const ordenesConAlimentos = this.ordenes.filter(orden => 
+                    orden.items_descripcion && (
+                        orden.items_descripcion.includes('Croissant') ||
+                        orden.items_descripcion.includes('Galleta') ||
+                        orden.items_descripcion.includes('Sándwich')
+                    )
+                );
+                
+                document.getElementById('ordenes-pendientes').textContent = 
+                    `${ordenesConAlimentos.length} órdenes de alimentos`;
+            }
+        }
+
+        // Inicializar cuando la página cargue
+        console.log('🎯 Iniciando aplicación cocina...');
+        document.addEventListener('DOMContentLoaded', function() {
+            window.cocina = new CocinaDisplay();
+            console.log('🎉 Cocina lista!');
+        });
+    </script>
+</body>
+</html>

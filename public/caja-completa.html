@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caja - Mi Cafetería</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #2E8B57, #3CB371);
+            color: white;
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 5px;
+        }
+
+        .stats {
+            font-size: 1.2em;
+            color: #FFD700;
+        }
+
+        .orders-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .caja-order {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            border-left: 5px solid #2E8B57;
+            color: #333;
+        }
+
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #2E8B57;
+        }
+
+        .mesa-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .mesa-number {
+            background: #2E8B57;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 1.3em;
+        }
+
+        .order-details {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .detail-section h3 {
+            color: #2E8B57;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+        }
+
+        .items-list {
+            list-style: none;
+        }
+
+        .items-list li {
+            padding: 5px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .total-section {
+            background: #F0FFF0;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #2E8B57;
+        }
+
+        .total-amount {
+            font-size: 2em;
+            font-weight: bold;
+            color: #2E8B57;
+            margin: 10px 0;
+        }
+
+        .order-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1.1em;
+            flex: 1;
+        }
+
+        .btn-cobrar {
+            background: #2E8B57;
+            color: white;
+        }
+
+        .btn-factura {
+            background: #4169E1;
+            color: white;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+            font-size: 1.3em;
+        }
+
+        .no-orders-message {
+            text-align: center;
+            padding: 40px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            border: 2px dashed rgba(255,255,255,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>💰 CAJA</h1>
+            <p>Sistema de cobro y facturación</p>
+            <div class="stats">
+                <span id="total-cobrar">$0.00 por cobrar</span>
+            </div>
+        </header>
+
+        <div class="orders-container">
+            <div id="ordenes-caja" class="orders-list">
+                <div class="loading">🔄 Cargando órdenes para cobrar...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ✅ CAJA COMPLETA - TODO EN UN ARCHIVO
+        console.log('💰 CAJA - Iniciando sistema...');
+        
+        class CajaDisplay {
+            constructor() {
+                this.ordenes = [];
+                this.baseURL = window.location.origin;
+                this.cargando = false;
+                
+                console.log('💰 Conectado a:', this.baseURL);
+                
+                this.inicializar();
+                this.cargarOrdenes();
+                setInterval(() => this.cargarOrdenes(), 4000);
+            }
+
+            inicializar() {
+                console.log('✅ Caja inicializada');
+            }
+
+            async cargarOrdenes() {
+                if (this.cargando) return;
+                this.cargando = true;
+                
+                try {
+                    console.log('📡 Caja: Consultando API...');
+                    const response = await fetch(this.baseURL + '/ordenes');
+                    
+                    if (!response.ok) throw new Error('Error: ' + response.status);
+                    
+                    const data = await response.json();
+                    console.log('✅ Caja: API OK -', data.ordenes.length, 'órdenes');
+                    
+                    if (data.success) {
+                        this.ordenes = data.ordenes;
+                        this.mostrarOrdenes();
+                        this.actualizarEstadisticas();
+                    }
+                    
+                } catch (error) {
+                    console.log('⚠️ Caja - Error temporal:', error.message);
+                } finally {
+                    this.cargando = false;
+                }
+            }
+
+            mostrarOrdenes() {
+                const contenedor = document.getElementById('ordenes-caja');
+                
+                console.log('💰 Mostrando', this.ordenes.length, 'órdenes');
+
+                if (this.ordenes.length === 0) {
+                    contenedor.innerHTML = `
+                        <div class="no-orders-message">
+                            <h3>💰 Sin órdenes pendientes</h3>
+                            <p>No hay órdenes para cobrar en este momento</p>
+                            <p><em>Se actualiza automáticamente</em></p>
+                            <p>Última actualización: ${new Date().toLocaleTimeString()}</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                contenedor.innerHTML = this.ordenes.map(orden => {
+                    const items = orden.items_descripcion.split(',');
+                    
+                    return `
+                        <div class="caja-order">
+                            <div class="order-header">
+                                <div class="mesa-info">
+                                    <div class="mesa-number">MESA ${orden.mesa}</div>
+                                    <div class="order-id">Orden #${orden.id}</div>
+                                </div>
+                                <div class="order-time">
+                                    ${new Date(orden.creado_en).toLocaleTimeString()}
+                                </div>
+                            </div>
+                            
+                            <div class="order-details">
+                                <div class="detail-section">
+                                    <h3>📋 Items:</h3>
+                                    <ul class="items-list">
+                                        ${items.map(item => `<li>${item.trim()}</li>`).join('')}
+                                    </ul>
+                                </div>
+                                
+                                <div class="detail-section total-section">
+                                    <h3>💰 Total a Cobrar</h3>
+                                    <div class="total-amount">$${orden.total.toFixed(2)}</div>
+                                    <div class="order-status">${orden.estado}</div>
+                                </div>
+                            </div>
+                            
+                            <div class="order-actions">
+                                <button class="btn btn-cobrar" onclick="alert('Cobrando orden #${orden.id} - $${orden.total.toFixed(2)}')">
+                                    💳 Cobrar $${orden.total.toFixed(2)}
+                                </button>
+                                <button class="btn btn-factura" onclick="this.generarFactura(${orden.id})">
+                                    🧾 Factura
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            actualizarEstadisticas() {
+                const total = this.ordenes.reduce((sum, orden) => sum + orden.total, 0);
+                document.getElementById('total-cobrar').textContent = 
+                    `$${total.toFixed(2)} por cobrar (${this.ordenes.length} órdenes)`;
+            }
+
+            generarFactura(ordenId) {
+                const orden = this.ordenes.find(o => o.id === ordenId);
+                if (orden) {
+                    const factura = `
+FACTURA - Café Tech
+Orden: #${orden.id} | Mesa: ${orden.mesa}
+${new Date().toLocaleString()}
+
+${orden.items_descripcion.split(',').map(item => item.trim()).join('\n')}
+
+TOTAL: $${orden.total.toFixed(2)}
+
+¡Gracias por su visita! ☕
+                    `;
+                    alert('Factura:\n\n' + factura);
+                }
+            }
+        }
+
+        // Inicializar caja
+        console.log('🎯 Iniciando aplicación caja...');
+        document.addEventListener('DOMContentLoaded', function() {
+            window.caja = new CajaDisplay();
+            console.log('🎉 Caja lista!');
+        });
+    </script>
+</body>
+</html>
