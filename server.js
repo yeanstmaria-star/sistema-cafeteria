@@ -180,7 +180,7 @@ app.get('/asistente-simple', (req, res) => {
 // Ruta principal para procesar pedidos por voz/texto
 app.post('/asistente/pedido', express.json(), async (req, res) => {
     try {
-        const { mensaje } = req.body;
+        const { mensaje, mesa = 1 } = req.body; // mesa por defecto 1
         
         if (!mensaje) {
             return res.status(400).json({ 
@@ -191,6 +191,35 @@ app.post('/asistente/pedido', express.json(), async (req, res) => {
         console.log('🎤 Procesando pedido del cliente:', mensaje);
         
         const resultado = await asistente.procesarPedido(mensaje);
+        
+        // ✅ NUEVO: Si el asistente detectó un pedido, CREAR ORDEN REAL
+        if (resultado.tienePedido && resultado.items.length > 0) {
+            console.log('📦 Creando orden real desde asistente...');
+            
+            try {
+                const ordenResponse = await fetch(`http://localhost:${PORT}/api/order`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mesa: mesa,
+                        items: resultado.items,
+                        total: resultado.total
+                    })
+                });
+                
+                const ordenResult = await ordenResponse.json();
+                console.log('✅ Orden creada desde asistente:', ordenResult);
+                
+                // Agregar info de la orden al resultado
+                resultado.ordenCreada = true;
+                resultado.orderId = ordenResult.orderId;
+                
+            } catch (ordenError) {
+                console.error('❌ Error creando orden desde asistente:', ordenError);
+                resultado.ordenCreada = false;
+                resultado.errorOrden = ordenError.message;
+            }
+        }
         
         res.json({
             success: true,

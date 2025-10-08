@@ -20,6 +20,18 @@
             const resultado = document.getElementById('resultado');
             
             resultado.innerHTML = '🔄 Enviando...';
+
+            // En la función probarAsistente(), después de recibir la respuesta:
+resultado.innerHTML = `
+    <strong>Respuesta:</strong> ${data.respuesta}<br>
+    <strong>Pedido detectado:</strong> ${data.tienePedido ? 'SÍ' : 'NO'}<br>
+    ${data.tienePedido ? `
+        <strong>Items:</strong> ${JSON.stringify(data.items)}<br>
+        <strong>Total:</strong> $${data.total}<br>
+        <strong>Orden creada:</strong> ${data.ordenCreada ? '✅ SÍ - Revisa Cocina/Barra/Caja' : '❌ NO'}<br>
+        ${data.orderId ? `<strong>ID Orden:</strong> ${data.orderId}` : ''}
+    ` : ''}
+`;
             
             try {
                 const response = await fetch('/asistente/pedido', {
