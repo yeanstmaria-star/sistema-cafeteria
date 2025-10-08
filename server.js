@@ -1,4 +1,4 @@
-// server.js - VERSIÓN CON BASE DE DATOS
+// server.js - VERSIÓN CON BASE DE DATOS Y ASISTENTE IA
 const express = require('express');
 const path = require('path');
 const Database = require('./database.js');
@@ -118,6 +118,11 @@ app.get('/', (req, res) => {
                     <a href="/menu.html" target="_blank">📱 Tableta Menú (Clientes)</a>
                     <a href="/cocina.html" target="_blank">👨‍🍳 Pantalla Cocina</a>
                     <a href="/caja.html" target="_blank">💰 Pantalla Caja</a>
+                    <a href="/bebidas.html" target="_blank">🍹 Barra de Bebidas</a>
+                    
+                    <h2 style="margin-top: 25px;">🤖 Asistente IA</h2>
+                    <a href="/asistente" target="_blank">🎤 Probar Asistente</a>
+                    <a href="/asistente/menu" target="_blank">📋 Menú del Asistente</a>
                     
                     <h2 style="margin-top: 25px;">📋 APIs del Sistema</h2>
                     <a href="/menu" target="_blank">🍽️ Ver Menú (Desde BD)</a>
@@ -129,6 +134,18 @@ app.get('/', (req, res) => {
     </body>
     </html>
     `);
+});
+
+// ==================== 🤖 RUTAS DEL ASISTENTE IA ====================
+
+// Ruta para probar que el asistente funciona (GET)
+app.get('/asistente', (req, res) => {
+    res.json({ 
+        mensaje: '🤖 Asistente IA activo!',
+        estado: asistente.modoSimulado ? 'modo simulado' : 'con IA real',
+        instrucciones: 'Usa POST /asistente/pedido con { "mensaje": "tu texto" }',
+        timestamp: new Date().toISOString()
+    });
 });
 
 // Ruta principal para procesar pedidos por voz/texto
@@ -167,9 +184,12 @@ app.get('/asistente/menu', (req, res) => {
     res.json({
         success: true,
         menu: asistente.menu,
-        modo: asistente.modoSimulado ? 'simulado' : 'IA real'
+        modo: asistente.modoSimulado ? 'simulado' : 'IA real',
+        timestamp: new Date().toISOString()
     });
 });
+
+// ==================== 🎯 RUTAS DEL SISTEMA ====================
 
 // Ruta para la barra de bebidas
 app.get('/bebidas.html', (req, res) => {
@@ -342,6 +362,7 @@ app.get('/admin', (req, res) => {
                 <p>SQLite: cafeteria.db</p>
                 <button class="btn" onclick="verProductos()">Ver Productos</button>
                 <button class="btn" onclick="verOrdenes()">Ver Órdenes</button>
+                <button class="btn" onclick="probarAsistente()">Probar Asistente IA</button>
             </div>
             <div id="resultado"></div>
         </div>
@@ -355,6 +376,11 @@ app.get('/admin', (req, res) => {
                 const response = await fetch('/ordenes');
                 const data = await response.json();
                 document.getElementById('resultado').innerHTML = '<h3>Órdenes:</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            }
+            async function probarAsistente() {
+                const response = await fetch('/asistente');
+                const data = await response.json();
+                document.getElementById('resultado').innerHTML = '<h3>Asistente IA:</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
             }
         </script>
     </body>
@@ -402,19 +428,21 @@ app.use((req, res) => {
 // Iniciar servidor
 app.listen(PORT, () => {
     console.log('='.repeat(70));
-    console.log('🏪 SISTEMA DE CAFETERÍA CON BASE DE DATOS INICIADO');
+    console.log('🏪 SISTEMA DE CAFETERÍA CON ASISTENTE IA INICIADO');
     console.log('='.repeat(70));
     console.log(`✅ Servidor: http://localhost:${PORT}`);
     console.log(`🗄️  Base de datos: cafeteria.db`);
+    console.log(`🤖 Asistente IA: http://localhost:${PORT}/asistente`);
     console.log(`📱 Tabletas: http://localhost:${PORT}/menu.html`);
     console.log(`👨‍🍳 Cocina: http://localhost:${PORT}/cocina.html`);
+    console.log(`🍹 Barra: http://localhost:${PORT}/bebidas.html`);
     console.log(`💰 Caja: http://localhost:${PORT}/caja.html`);
     console.log(`⚙️  Admin: http://localhost:${PORT}/admin`);
     console.log('='.repeat(70));
-    console.log('🎯 Características nuevas:');
+    console.log('🎯 Características:');
     console.log('   ✅ Menú desde base de datos');
     console.log('   ✅ Órdenes guardadas permanentemente');
+    console.log('   ✅ Asistente IA con Google Gemini');
     console.log('   ✅ Panel de administración');
-    console.log('   ✅ Persistencia de datos');
     console.log('='.repeat(70));
 });
