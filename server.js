@@ -127,6 +127,11 @@ app.get('/', (req, res) => {
     `);
 });
 
+// Ruta para la barra de bebidas
+app.get('/bebidas.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'bebidas.html'));
+});
+
 // Endpoint de salud para verificar que el servidor está vivo
 app.get('/health', (req, res) => {
     res.json({
