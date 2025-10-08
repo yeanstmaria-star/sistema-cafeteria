@@ -431,6 +431,97 @@ app.get('/ordenes', (req, res) => {
     });
 });
 
+// ==================== 📞 RUTAS DE TWILIO (LLAMADAS REALES) ====================
+
+// Webhook que recibe llamadas de Twilio
+app.post('/twilio/llamada', express.urlencoded({ extended: false }), async (req, res) => {
+    try {
+        console.log('📞 Llamada entrante de Twilio:', req.body);
+        
+        const mensajeGrabado = req.body.SpeechResult || '';
+        const numeroCliente = req.body.From || 'Desconocido';
+        
+        console.log(`📞 Cliente ${numeroCliente} dijo: "${mensajeGrabado}"`);
+        
+        // Procesar con el asistente IA
+        const resultado = await asistente.procesarPedido(mensajeGrabado);
+        
+        // Crear respuesta en formato TwiML (XML para Twilio)
+        let respuestaTwilio = `
+            <?xml version="1.0" encoding="UTF-8"?>
+            <Response>
+                <Say voice="alice" language="es-ES">${resultado.respuesta}</Say>
+        `;
+        
+        // Si hay pedido, confirmar y crear orden
+        if (resultado.tienePedido && resultado.items.length > 0) {
+            // Crear orden en el sistema
+            db.crearOrden({ mesa: 'telefono', total: resultado.total, tipo: 'llamada' }, (err, ordenId) => {
+                if (!err) {
+                    console.log('✅ Orden creada desde llamada:', ordenId);
+                    
+                    // Preparar items
+                    const itemsParaBD = resultado.items.map(item => ({
+                        producto_id: obtenerIdProductoPorNombre(item.nombre),
+                        cantidad: item.cantidad || 1,
+                        precio: item.precio
+                    }));
+
+                    db.agregarOrdenItems(ordenId, itemsParaBD, () => {
+                        // Simular envío a áreas
+                        const ordenSimulada = {
+                            id: ordenId,
+                            mesa: 'Telefono',
+                            items: resultado.items,
+                            total: resultado.total,
+                            status: 'recibido',
+                            timestamp: new Date().toISOString()
+                        };
+                        
+                        enviarACocina(ordenSimulada);
+                        enviarABarra(ordenSimulada);
+                        enviarACaja(ordenSimulada);
+                    });
+                }
+            });
+            
+            respuestaTwilio += `
+                <Say voice="alice" language="es-ES">He creado su orden en el sistema. Su pedido estará listo en 10 minutos. ¡Gracias!</Say>
+                <Hangup/>
+            </Response>
+            `;
+        } else {
+            respuestaTwilio += `
+                <Gather input="speech" action="/twilio/llamada" method="POST" language="es-ES" timeout="3">
+                    <Say voice="alice" language="es-ES">¿Algo más en lo que pueda ayudarle?</Say>
+                </Gather>
+            </Response>
+            `;
+        }
+        
+        res.type('text/xml');
+        res.send(respuestaTwilio);
+        
+    } catch (error) {
+        console.error('💥 Error en webhook Twilio:', error);
+        const errorResponse = `
+            <?xml version="1.0" encoding="UTF-8"?>
+            <Response>
+                <Say voice="alice" language="es-ES">Lo siento, estoy teniendo problemas técnicos. Por favor, llame más tarde.</Say>
+                <Hangup/>
+            </Response>
+        `;
+        res.type('text/xml');
+        res.send(errorResponse);
+    }
+});
+
+// Webhook para cuando la llamada termina
+app.post('/twilio/estado-llamada', express.urlencoded({ extended: false }), (req, res) => {
+    console.log('📞 Estado de llamada:', req.body.CallStatus);
+    res.status(200).end();
+});
+
 // Nuevo: Panel de administración
 app.get('/admin', (req, res) => {
     res.send(`
