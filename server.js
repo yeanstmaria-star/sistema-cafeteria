@@ -2,7 +2,7 @@
 const express = require('express');
 const path = require('path');
 const Database = require('./database.js');
-const AsistenteCafeteria = require('./AsistenteIA.js');
+const AsistenteCafeteria = require('./asistente-ia.js');
 
 // Crear instancia del asistente
 const asistente = new AsistenteCafeteria();
