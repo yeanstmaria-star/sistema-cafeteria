@@ -1,73 +1,155 @@
-// En asistente-demo.html, actualiza la función enviarMensaje:
+// AsistenteIA.js - VERSIÓN MEJORADA CON MEJORES RESPUESTAS
+let GoogleGenerativeAI;
+try {
+    GoogleGenerativeAI = require("@google/generative-ai").GoogleGenerativeAI;
+    console.log('✅ Google Generative AI cargado correctamente');
+} catch (error) {
+    console.log('⚠️  Google Generative AI no disponible, usando modo simulado');
+    GoogleGenerativeAI = null;
+}
 
-async function enviarMensaje() {
-    const input = document.getElementById('mensajeInput');
-    const mensaje = input.value.trim();
-    
-    if (!mensaje) {
-        alert('Por favor escribe un mensaje');
-        return;
-    }
-    
-    const respuestaDiv = document.getElementById('respuesta');
-    respuestaDiv.innerHTML = '<div style="text-align: center;">🔄 Procesando tu mensaje...</div>';
-    
-    try {
-        console.log('Enviando mensaje:', mensaje);
-        
-        const response = await fetch('/asistente/pedido', {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({ mensaje: mensaje })
-        });
-        
-        console.log('Respuesta recibida, status:', response.status);
-        
-        if (!response.ok) {
-            throw new Error(`Error ${response.status}: ${response.statusText}`);
+class AsistenteCafeteria {
+    constructor() {
+        if (GoogleGenerativeAI && process.env.GOOGLE_API_KEY) {
+            this.genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+            this.modoSimulado = false;
+            console.log('🤖 Asistente IA con Google Gemini');
+        } else {
+            this.modoSimulado = true;
+            console.log('🤖 Asistente en modo simulado (sin API key)');
         }
         
-        const data = await response.json();
-        console.log('Datos recibidos:', data);
+        this.menu = [
+            "☕ Capuchino - $3.50 (bebida)",
+            "☕ Latte - $3.00 (bebida)", 
+            "🍵 Té Verde - $2.50 (bebida)",
+            "🍫 Chocolate Caliente - $4.00 (bebida)",
+            "🧃 Jugo de Naranja - $3.50 (bebida)",
+            "🥐 Croissant - $2.00 (alimento)",
+            "🥯 Bagel - $2.50 (alimento)",
+            "🍪 Galleta - $1.50 (alimento)",
+            "🥪 Sándwich de Jamón - $5.50 (alimento)",
+            "🥗 Ensalada César - $6.00 (alimento)"
+        ];
+    }
+
+    async procesarPedido(loQueDijoElCliente) {
+        console.log('🎤 Cliente dijo:', loQueDijoElCliente);
         
-        let html = '';
-        if (data.success === false) {
-            html = `<div style="color: #856404; background: #fff3cd; padding: 15px; border-radius: 8px; border: 1px solid #ffeaa7;">
-                        <strong>⚠️ Aviso:</strong> ${data.error || 'Error desconocido'}
-                    </div>`;
-        } else {
-            html = `
-                <div class="${data.tienePedido ? 'pedido' : 'chat'}">
-                    <strong>🤖 Asistente:</strong> ${data.respuesta || 'No hay respuesta'}
-            `;
+        // Si no hay Google AI o está en modo simulado
+        if (this.modoSimulado || !this.genAI) {
+            return this.procesarPedidoSimulado(loQueDijoElCliente);
+        }
+        
+        try {
+            const model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
             
-            if (data.tienePedido && data.items && data.items.length > 0) {
-                html += `<div class="order-details">
-                            <strong>📦 Pedido detectado:</strong><br>`;
-                data.items.forEach(item => {
-                    html += `• ${item.nombre} x${item.cantidad} - $${item.precio}<br>`;
-                });
-                html += `<strong>💰 Total: $${data.total || 0}</strong>
-                        </div>`;
+            const prompt = `
+            Eres un asistente de cafetería. El cliente dijo: "${loQueDijoElCliente}"
+            
+            Responde SOLO en formato JSON:
+            {
+                "tienePedido": true/false,
+                "items": [{"nombre": "producto", "cantidad": 1, "precio": 3.50}],
+                "total": 10.50,
+                "respuesta": "Tu respuesta amable aquí"
+            }
+            `;
+
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            const texto = response.text();
+            
+            console.log('💬 Gemini respondió:', texto);
+            
+            const jsonMatch = texto.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                return JSON.parse(jsonMatch[0]);
+            } else {
+                throw new Error('No se pudo parsear la respuesta de Gemini');
             }
             
-            html += `</div>`;
+        } catch (error) {
+            console.error('💥 Error con Gemini:', error);
+            return this.procesarPedidoSimulado(loQueDijoElCliente);
+        }
+    }
+
+    procesarPedidoSimulado(textoCliente) {
+        const texto = textoCliente.toLowerCase();
+        console.log('🔄 Procesando en modo simulado:', texto);
+        
+        // Lógica mejorada de detección
+        if (texto.includes('hola') || texto.includes('buenos') || texto.includes('buenas')) {
+            return {
+                tienePedido: false,
+                items: [],
+                total: 0,
+                respuesta: "¡Hola! 👋 Bienvenido a Café Tech ☕ ¿En qué puedo ayudarle hoy?"
+            };
         }
         
-        respuestaDiv.innerHTML = html;
+        if (texto.includes('gracias') || texto.includes('bye') || texto.includes('adiós')) {
+            return {
+                tienePedido: false,
+                items: [],
+                total: 0,
+                respuesta: "¡Gracias por visitarnos! 😊 ¡Que tenga un excelente día! 🌟"
+            };
+        }
         
-    } catch (error) {
-        console.error('Error completo:', error);
-        respuestaDiv.innerHTML = `<div style="color: #721c24; background: #f8d7da; padding: 15px; border-radius: 8px; border: 1px solid #f5c6cb;">
-                                    ❌ <strong>Error de conexión:</strong><br>
-                                    ${error.message}<br>
-                                    <small>Verifica la consola para más detalles</small>
-                                 </div>`;
+        // Detectar pedidos específicos
+        const items = [];
+        let total = 0;
+        
+        if (texto.includes('capuchino') || texto.includes('café') || texto.includes('coffee')) {
+            const cantidad = texto.includes('dos') || texto.includes('2') ? 2 : 1;
+            items.push({ nombre: "Capuchino", cantidad: cantidad, precio: 3.50 });
+            total += 3.50 * cantidad;
+        }
+        
+        if (texto.includes('latte')) {
+            const cantidad = texto.includes('dos') || texto.includes('2') ? 2 : 1;
+            items.push({ nombre: "Latte", cantidad: cantidad, precio: 3.00 });
+            total += 3.00 * cantidad;
+        }
+        
+        if (texto.includes('té') || texto.includes('te') || texto.includes('tea')) {
+            const cantidad = texto.includes('dos') || texto.includes('2') ? 2 : 1;
+            items.push({ nombre: "Té Verde", cantidad: cantidad, precio: 2.50 });
+            total += 2.50 * cantidad;
+        }
+        
+        if (texto.includes('croissant')) {
+            const cantidad = texto.includes('dos') || texto.includes('2') ? 2 : 1;
+            items.push({ nombre: "Croissant", cantidad: cantidad, precio: 2.00 });
+            total += 2.00 * cantidad;
+        }
+        
+        if (texto.includes('galleta')) {
+            const cantidad = texto.includes('dos') || texto.includes('2') ? 2 : 1;
+            items.push({ nombre: "Galleta", cantidad: cantidad, precio: 1.50 });
+            total += 1.50 * cantidad;
+        }
+        
+        if (items.length > 0) {
+            const nombres = items.map(item => `${item.nombre} x${item.cantidad}`).join(', ');
+            return {
+                tienePedido: true,
+                items: items,
+                total: total,
+                respuesta: `¡Perfecto! 🎉 Su pedido: ${nombres}. Total: $${total.toFixed(2)}`
+            };
+        }
+        
+        // Respuesta por defecto si no detecta pedidos
+        return {
+            tienePedido: false,
+            items: [],
+            total: 0,
+            respuesta: "¡Hola! 😊 Puedo tomar pedidos de: ☕ capuchino, ☕ latte, 🍵 té, 🥐 croissant, 🍪 galleta, etc. ¿Qué le gustaría ordenar?"
+        };
     }
-    
-    input.value = '';
-    input.focus();
 }
+
+module.exports = AsistenteCafeteria;
