@@ -6,6 +6,9 @@
         body { font-family: Arial; padding: 20px; }
         input, button { padding: 10px; margin: 5px; }
         #resultado { margin-top: 20px; padding: 15px; border: 1px solid #ccc; }
+        .success { background: #d4edda; border-color: #c3e6cb; }
+        .info { background: #e9ecef; border-color: #ddd; }
+        .error { background: #f8d7da; border-color: #f5c6cb; color: #721c24; }
     </style>
 </head>
 <body>
@@ -19,19 +22,12 @@
             const mensaje = document.getElementById('mensaje').value;
             const resultado = document.getElementById('resultado');
             
-            resultado.innerHTML = '🔄 Enviando...';
-
-            // En la función probarAsistente(), después de recibir la respuesta:
-resultado.innerHTML = `
-    <strong>Respuesta:</strong> ${data.respuesta}<br>
-    <strong>Pedido detectado:</strong> ${data.tienePedido ? 'SÍ' : 'NO'}<br>
-    ${data.tienePedido ? `
-        <strong>Items:</strong> ${JSON.stringify(data.items)}<br>
-        <strong>Total:</strong> $${data.total}<br>
-        <strong>Orden creada:</strong> ${data.ordenCreada ? '✅ SÍ - Revisa Cocina/Barra/Caja' : '❌ NO'}<br>
-        ${data.orderId ? `<strong>ID Orden:</strong> ${data.orderId}` : ''}
-    ` : ''}
-`;
+            if (!mensaje) {
+                resultado.innerHTML = '<div class="error">❌ Por favor escribe un mensaje</div>';
+                return;
+            }
+            
+            resultado.innerHTML = '<div class="info">🔄 Enviando...</div>';
             
             try {
                 const response = await fetch('/asistente/pedido', {
@@ -41,16 +37,46 @@ resultado.innerHTML = `
                 });
                 
                 const data = await response.json();
-                resultado.innerHTML = `
-                    <strong>Respuesta:</strong> ${data.respuesta}<br>
-                    <strong>Pedido:</strong> ${data.tienePedido ? 'SÍ' : 'NO'}<br>
-                    <strong>Items:</strong> ${JSON.stringify(data.items)}<br>
-                    <strong>Total:</strong> $${data.total}
-                `;
+                
+                // ✅ CORRECTO: Mostrar después de recibir la respuesta
+                let html = '';
+                if (data.success === false) {
+                    html = `<div class="error">
+                                <strong>❌ Error:</strong> ${data.error}
+                            </div>`;
+                } else {
+                    const tieneOrden = data.ordenCreada || data.orderId;
+                    html = `
+                        <div class="${tieneOrden ? 'success' : 'info'}">
+                            <strong>🤖 Asistente:</strong> ${data.respuesta}<br>
+                            <strong>Pedido detectado:</strong> ${data.tienePedido ? '✅ SÍ' : '❌ NO'}<br>
+                    `;
+                    
+                    if (data.tienePedido && data.items && data.items.length > 0) {
+                        html += `
+                            <strong>📦 Items:</strong> ${data.items.map(item => `${item.nombre} x${item.cantidad}`).join(', ')}<br>
+                            <strong>💰 Total:</strong> $${data.total}<br>
+                            <strong>🛒 Orden creada:</strong> ${tieneOrden ? '✅ SÍ - Revisa Cocina/Barra/Caja' : '❌ NO'}<br>
+                            ${data.orderId ? `<strong>📋 ID Orden:</strong> ${data.orderId}` : ''}
+                        `;
+                    }
+                    
+                    html += `</div>`;
+                }
+                
+                resultado.innerHTML = html;
+                
             } catch (error) {
-                resultado.innerHTML = `❌ Error: ${error.message}`;
+                resultado.innerHTML = `<div class="error">
+                    ❌ Error de conexión: ${error.message}
+                </div>`;
             }
         }
+        
+        // Permitir Enter para enviar
+        document.getElementById('mensaje').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') probarAsistente();
+        });
     </script>
 </body>
 </html>
