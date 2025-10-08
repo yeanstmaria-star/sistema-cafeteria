@@ -1,4 +1,4 @@
-// server.js - VERSIÓN CON BASE DE DATOS Y ASISTENTE IA
+// server.js - VERSIÓN COMPLETA CORREGIDA CON ASISTENTE IA Y LLAMADAS
 const express = require('express');
 const path = require('path');
 const Database = require('./database.js');
@@ -14,16 +14,13 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// Ruta para la interfaz web del asistente
-app.get('/asistente-demo', (req, res) => {
-    res.sendFile(path.join(__dirname, 'asistente-demo.html'));
-});
-
 // Inicializar base de datos
 const db = new Database();
 
 // Variable para órdenes en memoria (temporal)
 let ordenesEnMemoria = [];
+
+// ==================== 🌐 RUTAS PRINCIPALES ====================
 
 // Página de inicio MEJORADA
 app.get('/', (req, res) => {
@@ -126,7 +123,9 @@ app.get('/', (req, res) => {
                     <a href="/bebidas.html" target="_blank">🍹 Barra de Bebidas</a>
                     
                     <h2 style="margin-top: 25px;">🤖 Asistente IA</h2>
-                    <a href="/asistente" target="_blank">🎤 Probar Asistente</a>
+                    <a href="/asistente-simple" target="_blank">🎤 Asistente Simple</a>
+                    <a href="/asistente-demo" target="_blank">💬 Asistente Demo</a>
+                    <a href="/llamadas-demo" target="_blank">📞 Simulador Llamadas</a>
                     <a href="/asistente/menu" target="_blank">📋 Menú del Asistente</a>
                     
                     <h2 style="margin-top: 25px;">📋 APIs del Sistema</h2>
@@ -153,79 +152,98 @@ app.get('/asistente', (req, res) => {
     });
 });
 
-// Después de procesar el pedido del asistente, crear la orden real
-app.post('/asistente/crear-orden', express.json(), async (req, res) => {
-    try {
-        const { mesa, items, total } = req.body;
-        
-        // Usar la misma lógica que /api/order
-        const orderResponse = await fetch(`http://localhost:${PORT}/api/order`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mesa, items, total })
-        });
-        
-        const orderResult = await orderResponse.json();
-        res.json(orderResult);
-        
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-app.get('/asistente-simple', (req, res) => {
-    res.sendFile(path.join(__dirname, 'asistente-simple.html'));
-});
-
-// Ruta principal para procesar pedidos por voz/texto
+// Ruta principal para procesar pedidos por voz/texto - VERSIÓN CORREGIDA
 app.post('/asistente/pedido', express.json(), async (req, res) => {
     try {
-        const { mensaje, mesa = 1 } = req.body; // mesa por defecto 1
+        const { mensaje, mesa = 1, origen } = req.body;
         
         if (!mensaje) {
             return res.status(400).json({ 
-                error: 'Por favor envía un mensaje: { "mensaje": "tu pedido" }' 
+                error: 'Por favor envía un mensaje' 
             });
         }
 
-        console.log('🎤 Procesando pedido del cliente:', mensaje);
+        console.log(origen === 'llamada' ? '📞 Llamada recibida:' : '🎤 Mensaje:', mensaje);
         
         const resultado = await asistente.procesarPedido(mensaje);
         
-        // ✅ NUEVO: Si el asistente detectó un pedido, CREAR ORDEN REAL
-        if (resultado.tienePedido && resultado.items.length > 0) {
-            console.log('📦 Creando orden real desde asistente...');
-            
-            try {
-                const ordenResponse = await fetch(`http://localhost:${PORT}/api/order`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        mesa: mesa,
-                        items: resultado.items,
-                        total: resultado.total
-                    })
-                });
-                
-                const ordenResult = await ordenResponse.json();
-                console.log('✅ Orden creada desde asistente:', ordenResult);
-                
-                // Agregar info de la orden al resultado
-                resultado.ordenCreada = true;
-                resultado.orderId = ordenResult.orderId;
-                
-            } catch (ordenError) {
-                console.error('❌ Error creando orden desde asistente:', ordenError);
-                resultado.ordenCreada = false;
-                resultado.errorOrden = ordenError.message;
-            }
+        // Si es una llamada, personalizar respuesta
+        if (origen === 'llamada') {
+            resultado.respuesta = "📞 " + resultado.respuesta.replace('¡Hola!', '¡Bienvenido! Por teléfono,');
         }
         
-        res.json({
-            success: true,
-            ...resultado,
-            timestamp: new Date().toISOString()
-        });
+        // ✅ CREAR ORDEN si se detectó un pedido - VERSIÓN CORREGIDA
+        if (resultado.tienePedido && resultado.items && resultado.items.length > 0) {
+            console.log('📦 Creando orden desde asistente...');
+            
+            // Crear orden directamente en la base de datos
+            db.crearOrden({ mesa: mesa, total: resultado.total, tipo: 'asistente' }, (err, ordenId) => {
+                if (err) {
+                    console.error('❌ Error creando orden:', err);
+                    resultado.ordenCreada = false;
+                    resultado.errorOrden = err.message;
+                    
+                    // Responder incluso si hay error
+                    res.json({
+                        success: true,
+                        ...resultado,
+                        timestamp: new Date().toISOString()
+                    });
+                } else {
+                    console.log('✅ Orden creada con ID:', ordenId);
+                    resultado.ordenCreada = true;
+                    resultado.orderId = ordenId;
+                    
+                    // Preparar items para la base de datos
+                    const itemsParaBD = resultado.items.map(item => ({
+                        producto_id: obtenerIdProductoPorNombre(item.nombre),
+                        cantidad: item.cantidad || 1,
+                        precio: item.precio
+                    }));
+
+                    // Guardar items en la base de datos
+                    db.agregarOrdenItems(ordenId, itemsParaBD, (err) => {
+                        if (err) {
+                            console.error('❌ Error guardando items:', err);
+                        }
+
+                        // Mantener en memoria para compatibilidad
+                        const nuevaOrdenMemoria = {
+                            id: ordenId,
+                            mesa: mesa,
+                            items: resultado.items,
+                            total: resultado.total,
+                            status: 'recibido',
+                            timestamp: new Date().toISOString()
+                        };
+                        
+                        ordenesEnMemoria.push(nuevaOrdenMemoria);
+                        
+                        // Simular envío a áreas
+                        enviarACocina(nuevaOrdenMemoria);
+                        enviarABarra(nuevaOrdenMemoria);
+                        enviarACaja(nuevaOrdenMemoria);
+                        
+                        console.log('🎉 Orden procesada completamente - ID:', ordenId);
+                        
+                        // Responder con éxito
+                        res.json({
+                            success: true,
+                            ...resultado,
+                            timestamp: new Date().toISOString()
+                        });
+                    });
+                }
+            });
+            
+        } else {
+            // Si no hay pedido, responder normalmente
+            res.json({
+                success: true,
+                ...resultado,
+                timestamp: new Date().toISOString()
+            });
+        }
         
     } catch (error) {
         console.error('💥 Error en ruta /asistente/pedido:', error);
@@ -252,6 +270,21 @@ app.get('/asistente/menu', (req, res) => {
 // Ruta para la barra de bebidas
 app.get('/bebidas.html', (req, res) => {
     res.sendFile(path.join(__dirname, 'bebidas.html'));
+});
+
+// Ruta para el asistente simple
+app.get('/asistente-simple', (req, res) => {
+    res.sendFile(path.join(__dirname, 'asistente-simple.html'));
+});
+
+// Ruta para el asistente demo
+app.get('/asistente-demo', (req, res) => {
+    res.sendFile(path.join(__dirname, 'asistente-demo.html'));
+});
+
+// Ruta para el simulador de llamadas
+app.get('/llamadas-demo', (req, res) => {
+    res.sendFile(path.join(__dirname, 'llamadas-demo.html'));
 });
 
 // Endpoint de salud para verificar que el servidor está vivo
@@ -421,6 +454,7 @@ app.get('/admin', (req, res) => {
                 <button class="btn" onclick="verProductos()">Ver Productos</button>
                 <button class="btn" onclick="verOrdenes()">Ver Órdenes</button>
                 <button class="btn" onclick="probarAsistente()">Probar Asistente IA</button>
+                <button class="btn" onclick="probarLlamadas()">Probar Llamadas</button>
             </div>
             <div id="resultado"></div>
         </div>
@@ -439,6 +473,9 @@ app.get('/admin', (req, res) => {
                 const response = await fetch('/asistente');
                 const data = await response.json();
                 document.getElementById('resultado').innerHTML = '<h3>Asistente IA:</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            }
+            async function probarLlamadas() {
+                window.open('/llamadas-demo', '_blank');
             }
         </script>
     </body>
@@ -495,12 +532,14 @@ app.listen(PORT, () => {
     console.log(`👨‍🍳 Cocina: http://localhost:${PORT}/cocina.html`);
     console.log(`🍹 Barra: http://localhost:${PORT}/bebidas.html`);
     console.log(`💰 Caja: http://localhost:${PORT}/caja.html`);
+    console.log(`📞 Llamadas: http://localhost:${PORT}/llamadas-demo`);
     console.log(`⚙️  Admin: http://localhost:${PORT}/admin`);
     console.log('='.repeat(70));
     console.log('🎯 Características:');
     console.log('   ✅ Menú desde base de datos');
     console.log('   ✅ Órdenes guardadas permanentemente');
     console.log('   ✅ Asistente IA con Google Gemini');
+    console.log('   ✅ Sistema de llamadas telefónicas');
     console.log('   ✅ Panel de administración');
     console.log('='.repeat(70));
 });
