@@ -1,143 +1,73 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Asistente IA - Cafetería</title>
-    <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            max-width: 600px; 
-            margin: 0 auto; 
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-        .chat-container { 
-            background: rgba(255,255,255,0.95); 
-            border-radius: 15px; 
-            padding: 20px; 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            color: #333;
-        }
-        .input-group { 
-            display: flex; 
-            gap: 10px; 
-            margin-top: 20px; 
-        }
-        input { 
-            flex: 1; 
-            padding: 12px; 
-            border: 2px solid #ddd; 
-            border-radius: 8px; 
-            font-size: 16px;
-        }
-        button { 
-            padding: 12px 24px; 
-            background: #4CAF50; 
-            color: white; 
-            border: none; 
-            border-radius: 8px; 
-            cursor: pointer; 
-            font-size: 16px;
-        }
-        button:hover { background: #45a049; }
-        .response { 
-            margin-top: 20px; 
-            padding: 15px; 
-            border-radius: 10px; 
-            min-height: 100px;
-        }
-        .pedido { 
-            background: #d4edda; 
-            border: 2px solid #c3e6cb;
-        }
-        .chat { 
-            background: #e9ecef; 
-            border: 2px solid #ddd;
-        }
-        .order-details {
-            background: #fff3cd;
-            padding: 10px;
-            border-radius: 5px;
-            margin-top: 10px;
-        }
-    </style>
-</head>
-<body>
-    <h1>🎤 Asistente IA - Cafetería</h1>
-    <div class="chat-container">
-        <p><strong>Instrucciones:</strong> Habla con el asistente como si fueras un cliente real.</p>
-        
-        <div class="input-group">
-            <input type="text" id="mensajeInput" placeholder="Ej: 'Hola, quiero un capuchino y un croissant'" />
-            <button onclick="enviarMensaje()">Enviar</button>
-        </div>
-        
-        <div id="respuesta" class="response">
-            <p>💬 Di algo al asistente para comenzar...</p>
-        </div>
-    </div>
+// En asistente-demo.html, actualiza la función enviarMensaje:
 
-    <script>
-        async function enviarMensaje() {
-            const input = document.getElementById('mensajeInput');
-            const mensaje = input.value.trim();
+async function enviarMensaje() {
+    const input = document.getElementById('mensajeInput');
+    const mensaje = input.value.trim();
+    
+    if (!mensaje) {
+        alert('Por favor escribe un mensaje');
+        return;
+    }
+    
+    const respuestaDiv = document.getElementById('respuesta');
+    respuestaDiv.innerHTML = '<div style="text-align: center;">🔄 Procesando tu mensaje...</div>';
+    
+    try {
+        console.log('Enviando mensaje:', mensaje);
+        
+        const response = await fetch('/asistente/pedido', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ mensaje: mensaje })
+        });
+        
+        console.log('Respuesta recibida, status:', response.status);
+        
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Datos recibidos:', data);
+        
+        let html = '';
+        if (data.success === false) {
+            html = `<div style="color: #856404; background: #fff3cd; padding: 15px; border-radius: 8px; border: 1px solid #ffeaa7;">
+                        <strong>⚠️ Aviso:</strong> ${data.error || 'Error desconocido'}
+                    </div>`;
+        } else {
+            html = `
+                <div class="${data.tienePedido ? 'pedido' : 'chat'}">
+                    <strong>🤖 Asistente:</strong> ${data.respuesta || 'No hay respuesta'}
+            `;
             
-            if (!mensaje) return;
-            
-            const respuestaDiv = document.getElementById('respuesta');
-            respuestaDiv.innerHTML = '🔄 Procesando...';
-            
-            try {
-                const response = await fetch('/asistente/pedido', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mensaje })
+            if (data.tienePedido && data.items && data.items.length > 0) {
+                html += `<div class="order-details">
+                            <strong>📦 Pedido detectado:</strong><br>`;
+                data.items.forEach(item => {
+                    html += `• ${item.nombre} x${item.cantidad} - $${item.precio}<br>`;
                 });
-                
-                const data = await response.json();
-                
-                let html = '';
-                if (data.success === false) {
-                    html = `<div style="color: red; padding: 15px; background: #f8d7da; border-radius: 8px;">
-                                <strong>❌ Error:</strong> ${data.error}
-                            </div>`;
-                } else {
-                    html = `
-                        <div class="${data.tienePedido ? 'pedido' : 'chat'}">
-                            <strong>🤖 Asistente:</strong> ${data.respuesta}
-                    `;
-                    
-                    if (data.tienePedido && data.items && data.items.length > 0) {
-                        html += `<div class="order-details">
-                                    <strong>📦 Pedido detectado:</strong><br>`;
-                        data.items.forEach(item => {
-                            html += `• ${item.nombre} x${item.cantidad} - $${item.precio}<br>`;
-                        });
-                        html += `<strong>💰 Total: $${data.total}</strong>
-                                </div>`;
-                    }
-                    
-                    html += `</div>`;
-                }
-                
-                respuestaDiv.innerHTML = html;
-                
-            } catch (error) {
-                respuestaDiv.innerHTML = `<div style="color: red; padding: 15px; background: #f8d7da; border-radius: 8px;">
-                                            ❌ Error de conexión: ${error.message}
-                                         </div>`;
+                html += `<strong>💰 Total: $${data.total || 0}</strong>
+                        </div>`;
             }
             
-            input.value = '';
-            input.focus();
+            html += `</div>`;
         }
         
-        // Permitir Enter para enviar
-        document.getElementById('mensajeInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') enviarMensaje();
-        });
-    </script>
-</body>
-</html>
+        respuestaDiv.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error completo:', error);
+        respuestaDiv.innerHTML = `<div style="color: #721c24; background: #f8d7da; padding: 15px; border-radius: 8px; border: 1px solid #f5c6cb;">
+                                    ❌ <strong>Error de conexión:</strong><br>
+                                    ${error.message}<br>
+                                    <small>Verifica la consola para más detalles</small>
+                                 </div>`;
+    }
+    
+    input.value = '';
+    input.focus();
+}

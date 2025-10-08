@@ -1,93 +1,73 @@
-// AsistenteIA.js - VERSIÓN RESILIENTE
-let GoogleGenerativeAI;
-try {
-    GoogleGenerativeAI = require("@google/generative-ai").GoogleGenerativeAI;
-    console.log('✅ Google Generative AI cargado correctamente');
-} catch (error) {
-    console.log('⚠️  Google Generative AI no disponible, usando modo simulado');
-    GoogleGenerativeAI = null;
-}
+// En asistente-demo.html, actualiza la función enviarMensaje:
 
-class AsistenteCafeteria {
-    constructor() {
-        if (GoogleGenerativeAI && process.env.GOOGLE_API_KEY) {
-            this.genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-            this.modoSimulado = false;
-            console.log('🤖 Asistente IA con Google Gemini');
+async function enviarMensaje() {
+    const input = document.getElementById('mensajeInput');
+    const mensaje = input.value.trim();
+    
+    if (!mensaje) {
+        alert('Por favor escribe un mensaje');
+        return;
+    }
+    
+    const respuestaDiv = document.getElementById('respuesta');
+    respuestaDiv.innerHTML = '<div style="text-align: center;">🔄 Procesando tu mensaje...</div>';
+    
+    try {
+        console.log('Enviando mensaje:', mensaje);
+        
+        const response = await fetch('/asistente/pedido', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ mensaje: mensaje })
+        });
+        
+        console.log('Respuesta recibida, status:', response.status);
+        
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Datos recibidos:', data);
+        
+        let html = '';
+        if (data.success === false) {
+            html = `<div style="color: #856404; background: #fff3cd; padding: 15px; border-radius: 8px; border: 1px solid #ffeaa7;">
+                        <strong>⚠️ Aviso:</strong> ${data.error || 'Error desconocido'}
+                    </div>`;
         } else {
-            this.modoSimulado = true;
-            console.log('🤖 Asistente en modo simulado');
+            html = `
+                <div class="${data.tienePedido ? 'pedido' : 'chat'}">
+                    <strong>🤖 Asistente:</strong> ${data.respuesta || 'No hay respuesta'}
+            `;
+            
+            if (data.tienePedido && data.items && data.items.length > 0) {
+                html += `<div class="order-details">
+                            <strong>📦 Pedido detectado:</strong><br>`;
+                data.items.forEach(item => {
+                    html += `• ${item.nombre} x${item.cantidad} - $${item.precio}<br>`;
+                });
+                html += `<strong>💰 Total: $${data.total || 0}</strong>
+                        </div>`;
+            }
+            
+            html += `</div>`;
         }
         
-        this.menu = [
-            "☕ Capuchino - $3.50 (bebida)",
-            "☕ Latte - $3.00 (bebida)", 
-            "🍵 Té Verde - $2.50 (bebida)",
-            "🍫 Chocolate Caliente - $4.00 (bebida)",
-            "🧃 Jugo de Naranja - $3.50 (bebida)",
-            "🥐 Croissant - $2.00 (alimento)",
-            "🥯 Bagel - $2.50 (alimento)",
-            "🍪 Galleta - $1.50 (alimento)",
-            "🥪 Sándwich de Jamón - $5.50 (alimento)",
-            "🥗 Ensalada César - $6.00 (alimento)"
-        ];
+        respuestaDiv.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error completo:', error);
+        respuestaDiv.innerHTML = `<div style="color: #721c24; background: #f8d7da; padding: 15px; border-radius: 8px; border: 1px solid #f5c6cb;">
+                                    ❌ <strong>Error de conexión:</strong><br>
+                                    ${error.message}<br>
+                                    <small>Verifica la consola para más detalles</small>
+                                 </div>`;
     }
-
-    async procesarPedido(loQueDijoElCliente) {
-        console.log('🎤 Cliente dijo:', loQueDijoElCliente);
-        
-        // Si no hay Google AI o está en modo simulado
-        if (this.modoSimulado || !this.genAI) {
-            return this.procesarPedidoSimulado(loQueDijoElCliente);
-        }
-        
-        try {
-            const model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-            // ... resto del código original de Gemini
-        } catch (error) {
-            console.error('💥 Error con Gemini:', error);
-            return this.procesarPedidoSimulado(loQueDijoElCliente);
-        }
-    }
-
-    procesarPedidoSimulado(textoCliente) {
-        const texto = textoCliente.toLowerCase();
-        
-        // Lógica simple de detección
-        if (texto.includes('hola') || texto.includes('buenos')) {
-            return {
-                tienePedido: false,
-                items: [],
-                total: 0,
-                respuesta: "¡Hola! Bienvenido a Café Tech ☕ ¿En qué puedo ayudarle hoy?"
-            };
-        }
-        
-        if (texto.includes('capuchino') || texto.includes('café')) {
-            return {
-                tienePedido: true,
-                items: [{ nombre: "Capuchino", cantidad: 1, precio: 3.50 }],
-                total: 3.50,
-                respuesta: "¡Perfecto! Un capuchino para usted ☕"
-            };
-        }
-        
-        if (texto.includes('croissant')) {
-            return {
-                tienePedido: true,
-                items: [{ nombre: "Croissant", cantidad: 1, precio: 2.00 }],
-                total: 2.00,
-                respuesta: "Excelente elección! Un croissant 🥐"
-            };
-        }
-        
-        return {
-            tienePedido: false,
-            items: [],
-            total: 0,
-            respuesta: "¡Hola! Puedo tomar pedidos de capuchino, latte, té, croissant, etc. ¿Qué le gustaría ordenar? 😊"
-        };
-    }
+    
+    input.value = '';
+    input.focus();
 }
-
-module.exports = AsistenteCafeteria;
