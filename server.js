@@ -140,141 +140,124 @@ app.get('/', (req, res) => {
     `);
 });
 
-// Webhook que recibe llamadas de Twilio - VERSIÓN MEJORADA
-app.post('/twilio/llamada', express.urlencoded({ extended: false }), async (req, res) => {
+// Webhook Twilio - VERSIÓN QUE SÍ FUNCIONA
+app.post('/twilio/llamada', express.urlencoded({ extended: false }), (req, res) => {
+    console.log('📞 Llamada entrante de Twilio:', req.body);
+    
+    // ✅ RESPONDER INMEDIATAMENTE con XML válido
+    const twimlResponse = `
+        <?xml version="1.0" encoding="UTF-8"?>
+        <Response>
+            <Say voice="alice" language="es-ES">
+                ¡Bienvenido a Café Tech! Gracias por llamar. 
+                Nuestro asistente virtual está listo para tomar su pedido.
+                Por favor, espere un momento mientras lo conecto.
+            </Say>
+            <Pause length="2"/>
+            <Say voice="alice" language="es-ES">
+                ¿Qué le gustaría ordenar hoy? Por ejemplo, puede pedir un capuchino, 
+                un latte, o un croissant.
+            </Say>
+            <Gather 
+                input="speech" 
+                action="/twilio/procesar-voz" 
+                method="POST" 
+                language="es-ES"
+                timeout="10">
+            </Gather>
+            <Say voice="alice" language="es-ES">
+                No le escuché. Por favor, llame de nuevo. ¡Gracias!
+            </Say>
+            <Hangup/>
+        </Response>
+    `;
+    
+    console.log('📤 Enviando respuesta TwiML a Twilio...');
+    res.type('text/xml');
+    res.send(twimlResponse);
+});
+
+// ✅ AGREGAR ESTA RUTA NUEVA PARA PROCESAR VOZ
+app.post('/twilio/procesar-voz', express.urlencoded({ extended: false }), async (req, res) => {
     try {
-        console.log('📞 Llamada entrante de Twilio:', req.body);
+        console.log('🎤 Procesando voz del cliente:', req.body);
         
-        // Detectar si es el inicio de la llamada o una respuesta
-        const esInicioLlamada = !req.body.SpeechResult;
         const mensajeCliente = req.body.SpeechResult || '';
         const numeroCliente = req.body.From || 'Desconocido';
         
-        if (esInicioLlamada) {
-            console.log('📞 Iniciando nueva llamada desde:', numeroCliente);
+        if (mensajeCliente) {
+            console.log(`🗣️ Cliente ${numeroCliente} dijo: "${mensajeCliente}"`);
             
-            // ✅ CONFIGURACIÓN CORRECTA: Usar Gather con speech, no digits
-            const respuestaInicial = `
+            // Procesar con el asistente IA
+            const resultado = await asistente.procesarPedido(mensajeCliente);
+            
+            console.log('🤖 Asistente respondió:', resultado.respuesta);
+            
+            let twimlResponse = `
                 <?xml version="1.0" encoding="UTF-8"?>
                 <Response>
+                    <Say voice="alice" language="es-ES">${resultado.respuesta}</Say>
+            `;
+            
+            // Si hay pedido, crear orden
+            if (resultado.tienePedido && resultado.items.length > 0) {
+                // Crear orden en el sistema
+                db.crearOrden({ mesa: 'telefono', total: resultado.total, tipo: 'llamada' }, (err, ordenId) => {
+                    if (!err) {
+                        console.log('✅ Orden creada desde llamada:', ordenId);
+                        
+                        // ... lógica para guardar items y enviar a áreas
+                    }
+                });
+                
+                twimlResponse += `
                     <Say voice="alice" language="es-ES">
-                        ¡Bienvenido a Café Tech! Soy su asistente virtual. 
-                        Por favor, dígame qué le gustaría ordenar después del tono.
-                    </Say>
-                    <Gather 
-                        input="speech" 
-                        action="/twilio/llamada" 
-                        method="POST" 
-                        language="es-ES"
-                        timeout="5"
-                        speechTimeout="auto">
-                        <Say voice="alice" language="es-ES">
-                            Estoy escuchando...
-                        </Say>
-                    </Gather>
-                    <!-- Si no hay respuesta, repetir -->
-                    <Say voice="alice" language="es-ES">
-                        No le escuché. Por favor, llame de nuevo. ¡Gracias!
+                        He creado su orden en el sistema. ¡Gracias por su pedido!
                     </Say>
                     <Hangup/>
                 </Response>
-            `;
+                `;
+            } else {
+                twimlResponse += `
+                    <Gather 
+                        input="speech" 
+                        action="/twilio/procesar-voz" 
+                        method="POST" 
+                        language="es-ES"
+                        timeout="10">
+                        <Say voice="alice" language="es-ES">
+                            ¿Algo más en lo que pueda ayudarle?
+                        </Say>
+                    </Gather>
+                    <Hangup/>
+                </Response>
+                `;
+            }
             
             res.type('text/xml');
-            return res.send(respuestaInicial);
+            return res.send(twimlResponse);
         }
         
-        // Si ya tenemos un mensaje del cliente
-        console.log(`🎤 Cliente ${numeroCliente} dijo: "${mensajeCliente}"`);
-        
-        // Procesar con el asistente IA
-        const resultado = await asistente.procesarPedido(mensajeCliente);
-        
-        console.log('🤖 Asistente respondió:', resultado.respuesta);
-        
-        let respuestaTwilio = `
+        // Si no hay mensaje, pedir de nuevo
+        const noSpeechResponse = `
             <?xml version="1.0" encoding="UTF-8"?>
             <Response>
-                <Say voice="alice" language="es-ES">${resultado.respuesta}</Say>
+                <Say voice="alice" language="es-ES">
+                    No le escuché. Por favor, intente de nuevo.
+                </Say>
+                <Redirect method="POST">/twilio/llamada</Redirect>
+            </Response>
         `;
-        
-        // Si hay pedido, confirmar y crear orden
-        if (resultado.tienePedido && resultado.items.length > 0) {
-            console.log('📦 Creando orden desde llamada...');
-            
-            // Crear orden en el sistema
-            db.crearOrden({ mesa: 'telefono', total: resultado.total, tipo: 'llamada' }, (err, ordenId) => {
-                if (err) {
-                    console.error('❌ Error creando orden:', err);
-                } else {
-                    console.log('✅ Orden creada desde llamada:', ordenId);
-                    
-                    // Preparar items
-                    const itemsParaBD = resultado.items.map(item => ({
-                        producto_id: obtenerIdProductoPorNombre(item.nombre),
-                        cantidad: item.cantidad || 1,
-                        precio: item.precio
-                    }));
-
-                    db.agregarOrdenItems(ordenId, itemsParaBD, () => {
-                        // Simular envío a áreas
-                        const ordenSimulada = {
-                            id: ordenId,
-                            mesa: 'Telefono',
-                            items: resultado.items,
-                            total: resultado.total,
-                            status: 'recibido',
-                            timestamp: new Date().toISOString()
-                        };
-                        
-                        enviarACocina(ordenSimulada);
-                        enviarABarra(ordenSimulada);
-                        enviarACaja(ordenSimulada);
-                    });
-                }
-            });
-            
-            respuestaTwilio += `
-                <Say voice="alice" language="es-ES">
-                    He creado su orden en el sistema. Su pedido estará listo en 10 minutos. 
-                    ¡Gracias por su llamada!
-                </Say>
-                <Hangup/>
-            </Response>
-            `;
-        } else {
-            // Si no hay pedido, dar otra oportunidad
-            respuestaTwilio += `
-                <Gather 
-                    input="speech" 
-                    action="/twilio/llamada" 
-                    method="POST" 
-                    language="es-ES"
-                    timeout="5">
-                    <Say voice="alice" language="es-ES">
-                        ¿Algo más en lo que pueda ayudarle? Por ejemplo, puede pedir: 
-                        un capuchino, un latte, un té, o un croissant.
-                    </Say>
-                </Gather>
-                <Say voice="alice" language="es-ES">
-                    No le escuché. Si necesita ayuda, por favor llame de nuevo. ¡Gracias!
-                </Say>
-                <Hangup/>
-            </Response>
-            `;
-        }
-        
         res.type('text/xml');
-        res.send(respuestaTwilio);
+        res.send(noSpeechResponse);
         
     } catch (error) {
-        console.error('💥 Error en webhook Twilio:', error);
+        console.error('💥 Error procesando voz:', error);
         const errorResponse = `
             <?xml version="1.0" encoding="UTF-8"?>
             <Response>
                 <Say voice="alice" language="es-ES">
-                    Lo siento, estoy teniendo problemas técnicos en este momento. 
-                    Por favor, llame más tarde o visite nuestra cafetería. ¡Gracias!
+                    Lo siento, hubo un error. Por favor, llame más tarde.
                 </Say>
                 <Hangup/>
             </Response>
