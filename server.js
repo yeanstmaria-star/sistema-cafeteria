@@ -140,313 +140,58 @@ app.get('/', (req, res) => {
     `);
 });
 
-// ==================== 🤖 RUTAS DEL ASISTENTE IA ====================
-
-// Ruta para probar que el asistente funciona (GET)
-app.get('/asistente', (req, res) => {
-    res.json({ 
-        mensaje: '🤖 Asistente IA activo!',
-        estado: asistente.modoSimulado ? 'modo simulado' : 'con IA real',
-        instrucciones: 'Usa POST /asistente/pedido con { "mensaje": "tu texto" }',
-        timestamp: new Date().toISOString()
-    });
-});
-
-// Ruta principal para procesar pedidos por voz/texto - VERSIÓN CORREGIDA
-app.post('/asistente/pedido', express.json(), async (req, res) => {
-    try {
-        const { mensaje, mesa = 1, origen } = req.body;
-        
-        if (!mensaje) {
-            return res.status(400).json({ 
-                error: 'Por favor envía un mensaje' 
-            });
-        }
-
-        console.log(origen === 'llamada' ? '📞 Llamada recibida:' : '🎤 Mensaje:', mensaje);
-        
-        const resultado = await asistente.procesarPedido(mensaje);
-        
-        // Si es una llamada, personalizar respuesta
-        if (origen === 'llamada') {
-            resultado.respuesta = "📞 " + resultado.respuesta.replace('¡Hola!', '¡Bienvenido! Por teléfono,');
-        }
-        
-        // ✅ CREAR ORDEN si se detectó un pedido - VERSIÓN CORREGIDA
-        if (resultado.tienePedido && resultado.items && resultado.items.length > 0) {
-            console.log('📦 Creando orden desde asistente...');
-            
-            // Crear orden directamente en la base de datos
-            db.crearOrden({ mesa: mesa, total: resultado.total, tipo: 'asistente' }, (err, ordenId) => {
-                if (err) {
-                    console.error('❌ Error creando orden:', err);
-                    resultado.ordenCreada = false;
-                    resultado.errorOrden = err.message;
-                    
-                    // Responder incluso si hay error
-                    res.json({
-                        success: true,
-                        ...resultado,
-                        timestamp: new Date().toISOString()
-                    });
-                } else {
-                    console.log('✅ Orden creada con ID:', ordenId);
-                    resultado.ordenCreada = true;
-                    resultado.orderId = ordenId;
-                    
-                    // Preparar items para la base de datos
-                    const itemsParaBD = resultado.items.map(item => ({
-                        producto_id: obtenerIdProductoPorNombre(item.nombre),
-                        cantidad: item.cantidad || 1,
-                        precio: item.precio
-                    }));
-
-                    // Guardar items en la base de datos
-                    db.agregarOrdenItems(ordenId, itemsParaBD, (err) => {
-                        if (err) {
-                            console.error('❌ Error guardando items:', err);
-                        }
-
-                        // Mantener en memoria para compatibilidad
-                        const nuevaOrdenMemoria = {
-                            id: ordenId,
-                            mesa: mesa,
-                            items: resultado.items,
-                            total: resultado.total,
-                            status: 'recibido',
-                            timestamp: new Date().toISOString()
-                        };
-                        
-                        ordenesEnMemoria.push(nuevaOrdenMemoria);
-                        
-                        // Simular envío a áreas
-                        enviarACocina(nuevaOrdenMemoria);
-                        enviarABarra(nuevaOrdenMemoria);
-                        enviarACaja(nuevaOrdenMemoria);
-                        
-                        console.log('🎉 Orden procesada completamente - ID:', ordenId);
-                        
-                        // Responder con éxito
-                        res.json({
-                            success: true,
-                            ...resultado,
-                            timestamp: new Date().toISOString()
-                        });
-                    });
-                }
-            });
-            
-        } else {
-            // Si no hay pedido, responder normalmente
-            res.json({
-                success: true,
-                ...resultado,
-                timestamp: new Date().toISOString()
-            });
-        }
-        
-    } catch (error) {
-        console.error('💥 Error en ruta /asistente/pedido:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Error procesando pedido',
-            mensaje: 'Lo siento, tengo problemas técnicos. ¿Puede repetir su pedido?'
-        });
-    }
-});
-
-// Ruta para ver el menú del asistente
-app.get('/asistente/menu', (req, res) => {
-    res.json({
-        success: true,
-        menu: asistente.menu,
-        modo: asistente.modoSimulado ? 'simulado' : 'IA real',
-        timestamp: new Date().toISOString()
-    });
-});
-
-// ==================== 🎯 RUTAS DEL SISTEMA ====================
-
-// Ruta para la barra de bebidas
-app.get('/bebidas.html', (req, res) => {
-    res.sendFile(path.join(__dirname, 'bebidas.html'));
-});
-
-// Ruta para el asistente simple
-app.get('/asistente-simple', (req, res) => {
-    res.sendFile(path.join(__dirname, 'asistente-simple.html'));
-});
-
-// Ruta para el asistente demo
-app.get('/asistente-demo', (req, res) => {
-    res.sendFile(path.join(__dirname, 'asistente-demo.html'));
-});
-
-// Ruta para el simulador de llamadas
-app.get('/llamadas-demo', (req, res) => {
-    res.sendFile(path.join(__dirname, 'llamadas-demo.html'));
-});
-
-// Endpoint de salud para verificar que el servidor está vivo
-app.get('/health', (req, res) => {
-    res.json({
-        status: 'OK',
-        message: 'Servidor funcionando correctamente',
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development'
-    });
-});
-
-// API para obtener el menú DESDE LA BASE DE DATOS
-app.get('/menu', (req, res) => {
-    db.obtenerProductos((err, productos) => {
-        if (err) {
-            console.error('❌ Error obteniendo menú:', err);
-            res.status(500).json({ error: 'Error obteniendo menú' });
-        } else {
-            // Formatear para compatibilidad con el frontend existente
-            const menuFormateado = {
-                bebidas: productos.filter(p => p.categoria === 'bebida'),
-                alimentos: productos.filter(p => p.categoria === 'alimento')
-            };
-            res.json(menuFormateado);
-        }
-    });
-});
-
-// API para recibir órdenes - GUARDAR EN BASE DE DATOS
-app.post('/api/order', (req, res) => {
-    try {
-        const { mesa, items, total } = req.body;
-        
-        console.log('📥 Nueva orden recibida - Mesa:', mesa);
-        
-        // Validaciones
-        if (!mesa || !items || !total) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Datos incompletos' 
-            });
-        }
-
-        // 1. Crear la orden en la base de datos
-        db.crearOrden({ mesa, total, tipo: 'mesa' }, (err, ordenId) => {
-            if (err) {
-                console.error('❌ Error creando orden en BD:', err);
-                return res.status(500).json({ 
-                    success: false, 
-                    error: 'Error guardando orden' 
-                });
-            }
-
-            console.log('✅ Orden creada en BD con ID:', ordenId);
-
-            // 2. Preparar items para la base de datos
-            const itemsParaBD = items.map(item => ({
-                producto_id: obtenerIdProductoPorNombre(item.nombre),
-                cantidad: item.cantidad || 1,
-                precio: item.precio
-            }));
-
-            // 3. Guardar items en la base de datos
-            db.agregarOrdenItems(ordenId, itemsParaBD, (err) => {
-                if (err) {
-                    console.error('❌ Error guardando items:', err);
-                    // Aún así respondemos éxito, pero logueamos el error
-                }
-
-                // 4. También mantener en memoria para compatibilidad temporal
-                const nuevaOrdenMemoria = {
-                    id: ordenId,
-                    mesa: mesa,
-                    items: items,
-                    total: total,
-                    status: 'recibido',
-                    timestamp: new Date().toISOString()
-                };
-                
-                ordenesEnMemoria.push(nuevaOrdenMemoria);
-                
-                // 5. Simular envío a áreas
-                enviarACocina(nuevaOrdenMemoria);
-                enviarABarra(nuevaOrdenMemoria);
-                enviarACaja(nuevaOrdenMemoria);
-                
-                console.log('🎉 Orden procesada completamente - ID:', ordenId);
-                
-                res.json({ 
-                    success: true, 
-                    orderId: ordenId,
-                    message: 'Orden recibida y guardada en base de datos' 
-                });
-            });
-        });
-        
-    } catch (error) {
-        console.error('❌ Error procesando orden:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Error interno del servidor' 
-        });
-    }
-});
-
-// Función auxiliar para obtener ID de producto por nombre
-function obtenerIdProductoPorNombre(nombre) {
-    const productosMap = {
-        'Capuchino': 1, 'Latte': 2, 'Té Verde': 3, 'Chocolate Caliente': 4, 'Jugo de Naranja': 5,
-        'Croissant': 6, 'Bagel': 7, 'Galleta': 8, 'Sándwich de Jamón': 9, 'Ensalada César': 10
-    };
-    return productosMap[nombre] || 1; // Default al primer producto si no encuentra
-}
-
-// API para ver todas las órdenes DESDE BASE DE DATOS - VERSIÓN CORREGIDA
-app.get('/ordenes', (req, res) => {
-    db.obtenerOrdenes((err, ordenes) => {
-        if (err) {
-            console.error('❌ Error obteniendo órdenes:', err);
-            res.status(500).json({ 
-                success: false,
-                error: 'Error obteniendo órdenes',
-                message: err.message 
-            });
-        } else {
-            // 🔥 CORRECCIÓN: Asegurar que siempre devolvemos el formato correcto
-            const ordenesFormateadas = ordenes.map(orden => ({
-                id: orden.id,
-                mesa: orden.mesa,
-                total: orden.total || 0,
-                estado: orden.estado || 'recibido',
-                tipo: orden.tipo || 'mesa',
-                creado_en: orden.creado_en,
-                items_descripcion: orden.items_descripcion || 'No items'
-            }));
-            
-            res.json({
-                success: true,
-                total: ordenesFormateadas.length,
-                ordenes: ordenesFormateadas
-            });
-        }
-    });
-});
-
-// ==================== 📞 RUTAS DE TWILIO (LLAMADAS REALES) ====================
-
-// Webhook que recibe llamadas de Twilio
+// Webhook que recibe llamadas de Twilio - VERSIÓN MEJORADA
 app.post('/twilio/llamada', express.urlencoded({ extended: false }), async (req, res) => {
     try {
         console.log('📞 Llamada entrante de Twilio:', req.body);
         
-        const mensajeGrabado = req.body.SpeechResult || '';
+        // Detectar si es el inicio de la llamada o una respuesta
+        const esInicioLlamada = !req.body.SpeechResult;
+        const mensajeCliente = req.body.SpeechResult || '';
         const numeroCliente = req.body.From || 'Desconocido';
         
-        console.log(`📞 Cliente ${numeroCliente} dijo: "${mensajeGrabado}"`);
+        if (esInicioLlamada) {
+            console.log('📞 Iniciando nueva llamada desde:', numeroCliente);
+            
+            // ✅ CONFIGURACIÓN CORRECTA: Usar Gather con speech, no digits
+            const respuestaInicial = `
+                <?xml version="1.0" encoding="UTF-8"?>
+                <Response>
+                    <Say voice="alice" language="es-ES">
+                        ¡Bienvenido a Café Tech! Soy su asistente virtual. 
+                        Por favor, dígame qué le gustaría ordenar después del tono.
+                    </Say>
+                    <Gather 
+                        input="speech" 
+                        action="/twilio/llamada" 
+                        method="POST" 
+                        language="es-ES"
+                        timeout="5"
+                        speechTimeout="auto">
+                        <Say voice="alice" language="es-ES">
+                            Estoy escuchando...
+                        </Say>
+                    </Gather>
+                    <!-- Si no hay respuesta, repetir -->
+                    <Say voice="alice" language="es-ES">
+                        No le escuché. Por favor, llame de nuevo. ¡Gracias!
+                    </Say>
+                    <Hangup/>
+                </Response>
+            `;
+            
+            res.type('text/xml');
+            return res.send(respuestaInicial);
+        }
+        
+        // Si ya tenemos un mensaje del cliente
+        console.log(`🎤 Cliente ${numeroCliente} dijo: "${mensajeCliente}"`);
         
         // Procesar con el asistente IA
-        const resultado = await asistente.procesarPedido(mensajeGrabado);
+        const resultado = await asistente.procesarPedido(mensajeCliente);
         
-        // Crear respuesta en formato TwiML (XML para Twilio)
+        console.log('🤖 Asistente respondió:', resultado.respuesta);
+        
         let respuestaTwilio = `
             <?xml version="1.0" encoding="UTF-8"?>
             <Response>
@@ -455,9 +200,13 @@ app.post('/twilio/llamada', express.urlencoded({ extended: false }), async (req,
         
         // Si hay pedido, confirmar y crear orden
         if (resultado.tienePedido && resultado.items.length > 0) {
+            console.log('📦 Creando orden desde llamada...');
+            
             // Crear orden en el sistema
             db.crearOrden({ mesa: 'telefono', total: resultado.total, tipo: 'llamada' }, (err, ordenId) => {
-                if (!err) {
+                if (err) {
+                    console.error('❌ Error creando orden:', err);
+                } else {
                     console.log('✅ Orden creada desde llamada:', ordenId);
                     
                     // Preparar items
@@ -486,15 +235,31 @@ app.post('/twilio/llamada', express.urlencoded({ extended: false }), async (req,
             });
             
             respuestaTwilio += `
-                <Say voice="alice" language="es-ES">He creado su orden en el sistema. Su pedido estará listo en 10 minutos. ¡Gracias!</Say>
+                <Say voice="alice" language="es-ES">
+                    He creado su orden en el sistema. Su pedido estará listo en 10 minutos. 
+                    ¡Gracias por su llamada!
+                </Say>
                 <Hangup/>
             </Response>
             `;
         } else {
+            // Si no hay pedido, dar otra oportunidad
             respuestaTwilio += `
-                <Gather input="speech" action="/twilio/llamada" method="POST" language="es-ES" timeout="3">
-                    <Say voice="alice" language="es-ES">¿Algo más en lo que pueda ayudarle?</Say>
+                <Gather 
+                    input="speech" 
+                    action="/twilio/llamada" 
+                    method="POST" 
+                    language="es-ES"
+                    timeout="5">
+                    <Say voice="alice" language="es-ES">
+                        ¿Algo más en lo que pueda ayudarle? Por ejemplo, puede pedir: 
+                        un capuchino, un latte, un té, o un croissant.
+                    </Say>
                 </Gather>
+                <Say voice="alice" language="es-ES">
+                    No le escuché. Si necesita ayuda, por favor llame de nuevo. ¡Gracias!
+                </Say>
+                <Hangup/>
             </Response>
             `;
         }
@@ -507,19 +272,16 @@ app.post('/twilio/llamada', express.urlencoded({ extended: false }), async (req,
         const errorResponse = `
             <?xml version="1.0" encoding="UTF-8"?>
             <Response>
-                <Say voice="alice" language="es-ES">Lo siento, estoy teniendo problemas técnicos. Por favor, llame más tarde.</Say>
+                <Say voice="alice" language="es-ES">
+                    Lo siento, estoy teniendo problemas técnicos en este momento. 
+                    Por favor, llame más tarde o visite nuestra cafetería. ¡Gracias!
+                </Say>
                 <Hangup/>
             </Response>
         `;
         res.type('text/xml');
         res.send(errorResponse);
     }
-});
-
-// Webhook para cuando la llamada termina
-app.post('/twilio/estado-llamada', express.urlencoded({ extended: false }), (req, res) => {
-    console.log('📞 Estado de llamada:', req.body.CallStatus);
-    res.status(200).end();
 });
 
 // Nuevo: Panel de administración
