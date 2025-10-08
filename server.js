@@ -2,6 +2,10 @@
 const express = require('express');
 const path = require('path');
 const Database = require('./database.js');
+const AsistenteCafeteria = require('./AsistenteIA.js');
+
+// Crear instancia del asistente
+const asistente = new AsistenteCafeteria();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -125,6 +129,46 @@ app.get('/', (req, res) => {
     </body>
     </html>
     `);
+});
+
+// Ruta principal para procesar pedidos por voz/texto
+app.post('/asistente/pedido', express.json(), async (req, res) => {
+    try {
+        const { mensaje } = req.body;
+        
+        if (!mensaje) {
+            return res.status(400).json({ 
+                error: 'Por favor envía un mensaje: { "mensaje": "tu pedido" }' 
+            });
+        }
+
+        console.log('🎤 Procesando pedido del cliente:', mensaje);
+        
+        const resultado = await asistente.procesarPedido(mensaje);
+        
+        res.json({
+            success: true,
+            ...resultado,
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('💥 Error en ruta /asistente/pedido:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Error procesando pedido',
+            mensaje: 'Lo siento, tengo problemas técnicos. ¿Puede repetir su pedido?'
+        });
+    }
+});
+
+// Ruta para ver el menú del asistente
+app.get('/asistente/menu', (req, res) => {
+    res.json({
+        success: true,
+        menu: asistente.menu,
+        modo: asistente.modoSimulado ? 'simulado' : 'IA real'
+    });
 });
 
 // Ruta para la barra de bebidas
