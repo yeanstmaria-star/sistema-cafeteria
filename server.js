@@ -153,6 +153,30 @@ app.get('/asistente', (req, res) => {
     });
 });
 
+// Después de procesar el pedido del asistente, crear la orden real
+app.post('/asistente/crear-orden', express.json(), async (req, res) => {
+    try {
+        const { mesa, items, total } = req.body;
+        
+        // Usar la misma lógica que /api/order
+        const orderResponse = await fetch(`http://localhost:${PORT}/api/order`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mesa, items, total })
+        });
+        
+        const orderResult = await orderResponse.json();
+        res.json(orderResult);
+        
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.get('/asistente-simple', (req, res) => {
+    res.sendFile(path.join(__dirname, 'asistente-simple.html'));
+});
+
 // Ruta principal para procesar pedidos por voz/texto
 app.post('/asistente/pedido', express.json(), async (req, res) => {
     try {

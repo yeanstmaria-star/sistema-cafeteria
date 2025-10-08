@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Asistente Simple</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        input, button { padding: 10px; margin: 5px; }
+        #resultado { margin-top: 20px; padding: 15px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>🤖 Asistente Simple</h1>
+    <input type="text" id="mensaje" placeholder="Escribe tu mensaje" style="width: 300px;">
+    <button onclick="probarAsistente()">Probar</button>
+    <div id="resultado"></div>
+
+    <script>
+        async function probarAsistente() {
+            const mensaje = document.getElementById('mensaje').value;
+            const resultado = document.getElementById('resultado');
+            
+            resultado.innerHTML = '🔄 Enviando...';
+            
+            try {
+                const response = await fetch('/asistente/pedido', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mensaje })
+                });
+                
+                const data = await response.json();
+                resultado.innerHTML = `
+                    <strong>Respuesta:</strong> ${data.respuesta}<br>
+                    <strong>Pedido:</strong> ${data.tienePedido ? 'SÍ' : 'NO'}<br>
+                    <strong>Items:</strong> ${JSON.stringify(data.items)}<br>
+                    <strong>Total:</strong> $${data.total}
+                `;
+            } catch (error) {
+                resultado.innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
