@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barra de Bebidas - Mi Cafetería</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1e88e5, #1565c0);
+            color: white;
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 5px;
+        }
+
+        .stats {
+            font-size: 1.2em;
+            color: #80deea;
+        }
+
+        .orders-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 15px;
+        }
+
+        .bar-order {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            border-left: 5px solid #0288d1;
+            color: #333;
+        }
+
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #0288d1;
+        }
+
+        .mesa-number {
+            background: #0288d1;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .order-time {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .drink-items {
+            margin: 10px 0;
+        }
+
+        .drink-item {
+            background: #e3f2fd;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 5px;
+            border-left: 3px solid #0288d1;
+        }
+
+        .item-specials {
+            font-style: italic;
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 3px;
+        }
+
+        .order-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            flex: 1;
+        }
+
+        .btn-preparando {
+            background: #0288d1;
+            color: white;
+        }
+
+        .btn-listoo {
+            background: #2E8B57;
+            color: white;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+            font-size: 1.3em;
+            grid-column: 1 / -1;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .no-orders-message {
+            text-align: center;
+            padding: 40px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            border: 2px dashed rgba(255,255,255,0.3);
+        }
+
+        .priority-badge {
+            background: #ff9800;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.8em;
+            margin-left: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🍹 BARRA DE BEBIDAS</h1>
+            <p>Órdenes de bebidas pendientes</p>
+            <div class="stats">
+                <span id="ordenes-pendientes">0 órdenes pendientes</span>
+            </div>
+        </header>
+
+        <div class="orders-container">
+            <div id="ordenes-bebidas" class="orders-grid">
+                <div class="loading">🔄 Cargando órdenes...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ✅ BARRA DE BEBIDAS - TODO EN UN ARCHIVO
+        console.log('🍹 BARRA DE BEBIDAS - Iniciando sistema...');
+        
+        class BarraBebidas {
+            constructor() {
+                this.ordenes = [];
+                this.baseURL = window.location.origin;
+                this.cargando = false;
+                
+                console.log('🍹 Conectado a:', this.baseURL);
+                
+                this.inicializar();
+                this.cargarOrdenes();
+                // Actualizar cada 4 segundos
+                setInterval(() => this.cargarOrdenes(), 4000);
+            }
+
+            inicializar() {
+                console.log('✅ Barra de bebidas inicializada');
+                document.getElementById('ordenes-pendientes').textContent = 'Conectado...';
+            }
+
+            async cargarOrdenes() {
+                if (this.cargando) return;
+                this.cargando = true;
+                
+                try {
+                    console.log('📡 Consultando API...');
+                    const response = await fetch(this.baseURL + '/ordenes');
+                    
+                    if (!response.ok) throw new Error('Error: ' + response.status);
+                    
+                    const data = await response.json();
+                    console.log('✅ API OK -', data.ordenes.length, 'órdenes');
+                    
+                    if (data.success) {
+                        this.ordenes = data.ordenes;
+                        this.mostrarOrdenes();
+                        this.actualizarEstadisticas();
+                    }
+                    
+                } catch (error) {
+                    console.log('⚠️ Error temporal:', error.message);
+                } finally {
+                    this.cargando = false;
+                }
+            }
+
+            esBebida(itemDescripcion) {
+                const bebidas = [
+                    'café', 'cafe', 'capuchino', 'expresso', 'americano',
+                    'té', 'te', 'chai', 'matcha',
+                    'refresco', 'soda', 'cola',
+                    'jugo', 'zumo', 'smoothie', 'frappé', 'frappe',
+                    'agua', 'limonada', 'batido'
+                ];
+                
+                const descripcion = itemDescripcion.toLowerCase();
+                return bebidas.some(bebida => descripcion.includes(bebida));
+            }
+
+            mostrarOrdenes() {
+                const contenedor = document.getElementById('ordenes-bebidas');
+                
+                // Filtrar órdenes con bebidas
+                const ordenesConBebidas = this.ordenes.filter(orden => {
+                    if (!orden.items_descripcion) return false;
+                    
+                    const items = orden.items_descripcion.split(',');
+                    return items.some(item => this.esBebida(item.trim()));
+                });
+
+                console.log('🍹 Órdenes con bebidas:', ordenesConBebidas.length);
+
+                if (ordenesConBebidas.length === 0) {
+                    contenedor.innerHTML = `
+                        <div class="no-orders-message">
+                            <h3>✅ Sin órdenes para barra</h3>
+                            <p>No hay bebidas pendientes de preparar</p>
+                            <p><em>Se actualiza automáticamente</em></p>
+                            <p>Última actualización: ${new Date().toLocaleTimeString()}</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                contenedor.innerHTML = ordenesConBebidas.map(orden => {
+                    const items = orden.items_descripcion.split(',');
+                    const bebidas = items.filter(item => this.esBebida(item.trim()));
+                    const alimentos = items.filter(item => !this.esBebida(item.trim()));
+
+                    return `
+                        <div class="bar-order">
+                            <div class="order-header">
+                                <div class="mesa-number">MESA ${orden.mesa}</div>
+                                <div class="order-id">#${orden.id}</div>
+                                <div class="order-time">${new Date(orden.creado_en).toLocaleTimeString()}</div>
+                            </div>
+                            
+                            <div class="drink-items">
+                                <h4>🥤 Bebidas:</h4>
+                                ${bebidas.map(bebida => `
+                                    <div class="drink-item">
+                                        ${bebida.trim()}
+                                        ${bebida.toLowerCase().includes('caliente') ? '<span class="priority-badge">🔥 CALIENTE</span>' : ''}
+                                        ${bebida.toLowerCase().includes('hielo') ? '<span class="priority-badge">❄️ CON HIELO</span>' : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
+                            
+                            ${alimentos.length > 0 ? `
+                                <div class="food-note">
+                                    <small><strong>Nota:</strong> Esta orden también incluye alimentos (en cocina)</small>
+                                </div>
+                            ` : ''}
+                            
+                            <div class="order-actions">
+                                <button class="btn btn-preparando" onclick="barra.marcarPreparando(${orden.id})">
+                                    🍹 Preparando
+                                </button>
+                                <button class="btn btn-listoo" onclick="barra.marcarListo(${orden.id})">
+                                    ✅ Listo
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            marcarPreparando(ordenId) {
+                alert(`🍹 Preparando bebidas para orden #${ordenId}`);
+                // Aquí puedes agregar lógica para actualizar el estado en el servidor
+            }
+
+            marcarListo(ordenId) {
+                alert(`✅ Bebidas listas para orden #${ordenId}`);
+                // Aquí puedes agregar lógica para actualizar el estado en el servidor
+            }
+
+            actualizarEstadisticas() {
+                const ordenesConBebidas = this.ordenes.filter(orden => {
+                    if (!orden.items_descripcion) return false;
+                    const items = orden.items_descripcion.split(',');
+                    return items.some(item => this.esBebida(item.trim()));
+                });
+                
+                document.getElementById('ordenes-pendientes').textContent = 
+                    `${ordenesConBebidas.length} órdenes de bebidas`;
+            }
+        }
+
+        // Inicializar cuando la página cargue
+        console.log('🎯 Iniciando aplicación barra de bebidas...');
+        document.addEventListener('DOMContentLoaded', function() {
+            window.barra = new BarraBebidas();
+            console.log('🎉 Barra de bebidas lista!');
+        });
+    </script>
+</body>
+</html>
