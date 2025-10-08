@@ -14,6 +14,11 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
+// Ruta para la interfaz web del asistente
+app.get('/asistente-demo', (req, res) => {
+    res.sendFile(path.join(__dirname, 'asistente-demo.html'));
+});
+
 // Inicializar base de datos
 const db = new Database();
 
